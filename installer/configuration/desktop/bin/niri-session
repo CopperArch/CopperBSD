@@ -1,0 +1,17 @@
+#!/bin/sh
+# niri-session — start a Niri Wayland session the FreeBSD way.
+# seatd provides seat management (no logind); dbus-run-session gives a session
+# bus; XDG_RUNTIME_DIR is created if the greeter didn't. QuickShell is launched
+# by niri's own spawn-at-startup (see /usr/local/etc/niri/config.kdl), so we do
+# not need systemd --user.
+: "${XDG_RUNTIME_DIR:=/var/run/user/$(id -u)}"
+export XDG_RUNTIME_DIR
+[ -d "$XDG_RUNTIME_DIR" ] || { mkdir -p "$XDG_RUNTIME_DIR"; chmod 700 "$XDG_RUNTIME_DIR"; }
+export XDG_SESSION_TYPE=wayland
+export XDG_CURRENT_DESKTOP=niri
+# Mesa/DRM on FreeBSD: let libglvnd pick; software fallback if no KMS.
+export MOZ_ENABLE_WAYLAND=1 QT_QPA_PLATFORM=wayland _JAVA_AWT_WM_NONREPARENTING=1
+# user config overrides the system default if present
+CFG=/usr/local/etc/niri/config.kdl
+[ -f "$HOME/.config/niri/config.kdl" ] && CFG="$HOME/.config/niri/config.kdl"
+exec dbus-run-session -- niri --config "$CFG"

@@ -1,0 +1,31 @@
+#!/bin/sh
+# PROVIDE: copperarch_diag
+# REQUIRE: LOGIN
+# Live-medium diagnostic: dump the display-stack logs to the first serial port
+# a little after boot, so a headless/VM boot can be debugged from the host.
+. /etc/rc.subr
+name=copperarch_diag
+start_cmd=copperarch_diag_start
+copperarch_diag_start()
+{
+    [ -c /dev/cuau0 ] || return 0
+    (
+        for wait in 40 40 60; do
+            sleep "$wait"
+            {
+                echo "=== copperarch_diag $(date +%T) ==="
+                echo "--- processes"; ps ax -o pid,user,command | grep -E 'sddm|Xorg|copperarch|dbus' | grep -v grep
+                echo "--- /dev/dri"; ls /dev/dri 2>&1
+                echo "--- sddm.log"; tail -30 /var/log/sddm.log 2>&1
+                echo "--- Xorg.0.log (EE/WW)"; grep -E '\((EE|WW)\)' /var/log/Xorg.0.log 2>&1 | tail -25
+                echo "--- input"; ls -l /dev/input 2>&1; sysctl kern.evdev.rcpt_mask 2>&1; ps ax -o pid,command | grep -E 'moused|devd' | grep -v grep
+                echo "--- Xorg input"; grep -iE 'input|libinput|evdev|mouse|pointer|udev' /var/log/Xorg.0.log 2>&1 | tail -25
+                echo "--- xrandr"; DISPLAY=:0 XAUTHORITY=$(ls /var/run/sddm/xauth_* 2>/dev/null | head -1) xrandr 2>&1 | head -25
+                echo "--- Xorg modes"; grep -E "VESA.*(mode|Mode|virtual)|Virtual screen|Modeline" /var/log/Xorg.0.log | tail -20
+                echo "--- installer"; tail -20 /var/live/copperarch-installer.log 2>&1
+            } > /dev/cuau0 2>&1
+        done
+    ) &
+}
+load_rc_config $name
+run_rc_command "$1"

@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=CopperArch Installer
+Comment=Install CopperArch Media to disk
+Exec=/usr/local/bin/copperarch-installer-session
+Type=Application
+DesktopNames=copperarch-installer

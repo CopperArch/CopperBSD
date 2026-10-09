@@ -1,0 +1,18 @@
+# build products
+/build/output/
+/build/.vm/
+*.iso
+*.iso.sha256
+
+# full FreeBSD source is fetched at the pinned commit, never committed
+/freebsd/src/
+
+# profiles with real secrets never get committed
+my-profile*.yaml
+*.local.yaml
+profiles/my-*.yaml
+
+__pycache__/
+*.pyc
+.DS_Store
+*.log

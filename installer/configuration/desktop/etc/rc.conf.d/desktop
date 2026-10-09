@@ -1,0 +1,5 @@
+# CopperBSD desktop/Wayland services (FreeBSD-native; no systemd).
+seatd_enable="YES"
+dbus_enable="YES"
+sddm_enable="YES"
+moused_enable="YES"

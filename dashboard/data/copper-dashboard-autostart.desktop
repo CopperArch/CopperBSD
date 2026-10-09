@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=CopperBSD Dashboard
+Comment=Open the CopperBSD control center at login
+Exec=copper-dashboard
+Icon=copper-dashboard
+Terminal=false
+X-KDE-autostart-after=panel
+OnlyShowIn=KDE;

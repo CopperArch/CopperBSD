@@ -1,0 +1,54 @@
+#!/bin/sh
+# PROVIDE: copperarch_liveuser
+# REQUIRE: FILESYSTEMS
+# BEFORE: sddm
+# The live user itself is baked into the image (read-only root), but /var is
+# a fresh tmpfs at every boot, so its home and sddm's state dir must be
+# recreated before sddm autologs in. It also writes the Xorg config sddm points
+# at (/var is the only writable place): with a KMS GPU it is bare and Xorg
+# autodetects as usual; with none (VMs, BIOS-only boards) the framebuffer
+# driver gets no EDID and Xorg's conservative default sync ranges reject 1080p
+# ("hsync out of range"), so widen them and ask for 1920x1080.
+. /etc/rc.subr
+name=copperarch_liveuser
+start_cmd=copperarch_liveuser_start
+copperarch_liveuser_start()
+{
+    mkdir -p /var/live /var/lib/sddm
+    chown live:live /var/live
+    chmod 755 /var/live
+
+    conf=/var/run/copperarch-xorg.conf
+    printf 'Section "ServerFlags"\n    Option "DontZap" "true"\nEndSection\n' > "$conf"
+    if [ ! -e /dev/dri/card0 ]; then
+        # scfb drives the UEFI GOP framebuffer, vesa the BIOS VBE one
+        if [ "$(sysctl -n machdep.bootmethod 2>/dev/null)" = UEFI ]; then
+            drv=scfb
+        else
+            drv=vesa
+        fi
+        cat >> "$conf" <<EOF
+Section "Monitor"
+    Identifier "Monitor0"
+    HorizSync 30-140
+    VertRefresh 48-120
+EndSection
+Section "Device"
+    Identifier "Card0"
+    Driver "$drv"
+EndSection
+Section "Screen"
+    Identifier "Screen0"
+    Device "Card0"
+    Monitor "Monitor0"
+    DefaultDepth 24
+    SubSection "Display"
+        Depth 24
+        Modes "1920x1080" "1280x720" "1024x768"
+    EndSubSection
+EndSection
+EOF
+    fi
+}
+load_rc_config $name
+run_rc_command "$1"

@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=Niri + QuickShell
+Comment=Scrollable-tiling Wayland compositor with QuickShell
+Exec=/usr/local/bin/niri-session
+Type=Application
+DesktopNames=niri

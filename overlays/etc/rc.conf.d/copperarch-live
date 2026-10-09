@@ -1,0 +1,4 @@
+# Live environment knobs (ignored on the installed system — this file lives
+# only on the ISO). The live user is baked into the image at build time.
+dbus_enable="YES"
+sddm_enable="YES"

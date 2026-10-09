@@ -1,0 +1,42 @@
+# pf-killswitch.conf — leak-proof firewall for the VPN jail.
+#
+# gluetun's whole selling point was: if the tunnel drops, the torrent client
+# loses ALL connectivity rather than falling back to your real IP. This pf
+# ruleset does the same thing, enforced by the kernel, for the `vpn` jail and
+# every jail routed through it (qbittorrent, sonarr, radarr).
+#
+# Load inside the vpn jail (or on the host, scoped to the jail's epair):
+#     pfctl -f /etc/pf.conf
+#
+# The logic: allow (1) the LAN so the WebUI is reachable and the *arr apps can
+# talk to Jellyfin/Plex, (2) the handshake to the VPN endpoint itself, (3)
+# anything on the wg0 tunnel. Block everything else outbound. If wg0 goes away,
+# rule (3) matches nothing and all torrent/indexer traffic is dropped — no
+# packet ever egresses on the physical NIC.
+
+wg_if   = "wg0"
+lan_net = "{{LAN_CIDR}}"
+vpn_ep  = "{{WG_ENDPOINT_IP}}"     # bare IP of the WireGuard endpoint
+vpn_pt  = "{{WG_ENDPOINT_PORT}}"
+
+set skip on lo0
+set block-policy drop
+scrub in all
+
+# Default deny, both directions.
+block in  all
+block out all
+
+# ── allow the WireGuard handshake to the endpoint over the physical NIC ──
+pass out quick proto udp to $vpn_ep port $vpn_pt keep state
+
+# ── allow LAN so the WebUI is reachable and *arr can hit the media jails ─
+pass in  quick from $lan_net to any keep state
+pass out quick from any to $lan_net keep state
+
+# ── allow everything ON the tunnel; this is the ONLY general egress path ─
+pass out quick on $wg_if all keep state
+pass in  quick on $wg_if all keep state
+
+# Anything not matched above is dropped by the default block rules — so a
+# dead tunnel means zero connectivity, never a fallback to the real IP.

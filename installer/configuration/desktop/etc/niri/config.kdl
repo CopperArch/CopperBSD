@@ -1,0 +1,72 @@
+// CopperBSD default Niri config. System-wide default; users copy to
+// ~/.config/niri/config.kdl to override. No hardcoded monitor names — niri
+// auto-detects outputs. Live-reloads on save.
+
+input {
+    keyboard {
+        xkb {
+            // layout/variant set from the installer's keymap choice at install
+            // time (see post-install); default "us".
+            layout "us"
+        }
+    }
+    touchpad {
+        tap
+        natural-scroll
+        dwt            // disable-while-typing
+    }
+    mouse {}
+    focus-follows-mouse
+}
+
+// Let niri pick modes/scale per output automatically (fractional scale works).
+// Users add `output "DP-1" { scale 1.5 }` blocks to override.
+
+layout {
+    gaps 12
+    center-focused-column "never"
+    default-column-width { proportion 0.5; }
+    focus-ring {
+        width 3
+        active-color "#c86a3a"       // CopperBSD copper accent
+        inactive-color "#394150"
+    }
+    border { off; }
+}
+
+// QuickShell is the panel/launcher/notifications surface — started with the
+// session, the FreeBSD-native way (no systemd --user).
+spawn-at-startup "quickshell"
+// A wallpaper daemon + notifications + idle/lock, all Wayland-native:
+spawn-at-startup "swaybg" "-i" "/usr/local/share/copperbsd/wallpaper.png" "-m" "fill"
+spawn-at-startup "mako"
+spawn-at-startup "swayidle" "-w" "timeout" "600" "swaylock -f" "timeout" "900" "niri msg action power-off-monitors"
+
+prefer-no-csd
+screenshot-path "~/Pictures/Screenshots/screenshot-%Y-%m-%d-%H-%M-%S.png"
+
+// Keybinds (Mod = Super). Terminal/launcher/filemanager use packages the niri
+// group installs.
+binds {
+    "Mod+Return"       { spawn "foot"; }
+    "Mod+D"            { spawn "fuzzel"; }
+    "Mod+E"            { spawn "pcmanfm-qt"; }
+    "Mod+Q"            { close-window; }
+    "Mod+Shift+E"      { quit; }
+    "Mod+L"            { spawn "swaylock" "-f"; }
+    "Print"            { screenshot; }
+    "Mod+1"            { focus-workspace 1; }
+    "Mod+2"            { focus-workspace 2; }
+    "Mod+3"            { focus-workspace 3; }
+    "Mod+Left"         { focus-column-left; }
+    "Mod+Right"        { focus-column-right; }
+    "Mod+Shift+Left"   { move-column-left; }
+    "Mod+Shift+Right"  { move-column-right; }
+    "Mod+F"            { maximize-column; }
+    "Mod+Shift+F"      { fullscreen-window; }
+    "XF86AudioRaiseVolume" { spawn "pactl" "set-sink-volume" "@DEFAULT_SINK@" "+5%"; }
+    "XF86AudioLowerVolume" { spawn "pactl" "set-sink-volume" "@DEFAULT_SINK@" "-5%"; }
+    "XF86AudioMute"        { spawn "pactl" "set-sink-mute" "@DEFAULT_SINK@" "toggle"; }
+    "XF86MonBrightnessUp"   { spawn "brightnessctl" "set" "+5%"; }
+    "XF86MonBrightnessDown" { spawn "brightnessctl" "set" "5%-"; }
+}

@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=MangoWC + QuickShell
+Comment=dwl/wlroots tiling Wayland compositor with QuickShell
+Exec=/usr/local/bin/mangowc-session
+Type=Application
+DesktopNames=mangowc

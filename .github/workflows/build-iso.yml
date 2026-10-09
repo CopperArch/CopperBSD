@@ -1,0 +1,56 @@
+name: Build CopperBSD ISO
+
+# Zero local setup: this provisions a real FreeBSD 15.x VM inside the runner,
+# builds the CopperBSD live ISO, and uploads it as an artifact. No FreeBSD host
+# is required from you — triggering this workflow IS the build.
+
+on:
+  workflow_dispatch:
+    inputs:
+      from_source:
+        description: "1 = buildworld from pinned FreeBSD source (slow); 0 = 15.1 release sets (fast)"
+        default: "0"
+        required: true
+  push:
+    paths:
+      - "build/**"
+      - "release/**"
+      - "overlays/**"
+      - "installer/**"
+      - "project/**"
+      - ".github/workflows/build-iso.yml"
+
+jobs:
+  build-iso:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the ISO inside a FreeBSD 15.x VM
+        uses: vmactions/freebsd-vm@v1
+        with:
+          release: "15.1"
+          usesh: true
+          # buildworld/pkg need space + RAM
+          mem: 8192
+          cpu: 4
+          prepare: |
+            pkg install -y git cmake ninja pkgconf
+          run: |
+            set -e
+            export FROM_SOURCE="${{ github.event.inputs.from_source || '0' }}"
+            sh build/in-vm-build.sh
+
+      - name: Validate the ISO
+        run: |
+          sh tests/iso-validate.sh build/output/*.iso
+
+      - name: Upload ISO + checksum
+        uses: actions/upload-artifact@v4
+        with:
+          name: CopperBSD-ISO
+          path: |
+            build/output/*.iso
+            build/output/*.iso.sha256
+          if-no-files-found: error

@@ -1,0 +1,14 @@
+#!/bin/sh
+# copperarch-installer-session — live-medium-only kiosk session: boots
+# straight into the CopperArch installer via `cage` (a minimal Wayland
+# kiosk compositor) instead of a full desktop session. Keeps the live ISO
+# small -- no KDE/GNOME/XFCE is needed just to run the installer. Mirrors
+# the FreeBSD-native pattern used by niri-session/mangowc-session: seatd for
+# seat management (no logind), dbus-run-session for the session bus.
+: "${XDG_RUNTIME_DIR:=/var/run/user/$(id -u)}"
+export XDG_RUNTIME_DIR
+[ -d "$XDG_RUNTIME_DIR" ] || { mkdir -p "$XDG_RUNTIME_DIR"; chmod 700 "$XDG_RUNTIME_DIR"; }
+export XDG_SESSION_TYPE=wayland
+export XDG_CURRENT_DESKTOP=copperarch-installer
+export QT_QPA_PLATFORM=wayland
+exec dbus-run-session -- cage -- /usr/local/bin/copperarch-installer

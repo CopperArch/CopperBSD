@@ -1,0 +1,10 @@
+--- a/usr.sbin/makefs/cd9660.c
++++ b/usr.sbin/makefs/cd9660.c
+@@ -1076,6 +1076,8 @@
+ 		else
+ 			numbts = maxlength - (digits);
+ 		numbts -= delete_chars;
++		if (numbts < 0)
++			numbts = 0; /* CopperBSD fix: avoid negative-size memcpy */
+
+ 		/* 8.3 rules - keep the extension, add before the dot */

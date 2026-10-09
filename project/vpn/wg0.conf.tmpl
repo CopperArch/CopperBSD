@@ -1,0 +1,36 @@
+# wg0.conf — WireGuard tunnel for the `vpn` jail.
+#
+# This is the FreeBSD-native replacement for the gluetun container. FreeBSD has
+# kernel WireGuard (if_wg) since 14.x, so the tunnel runs in-kernel; wg-quick
+# (wireguard-tools) just configures it. Load with:
+#
+#     sysrc wireguard_enable=YES wireguard_interfaces="wg0"
+#     service wireguard start          # inside the vpn jail
+#
+# Most commercial providers (Mullvad, Surfshark, PIA, ProtonVPN...) give you a
+# WireGuard config directly — paste its values into the profile and this
+# template renders them here. Unlike OpenVPN/gluetun there is no username/
+# password; WireGuard authenticates with keypairs.
+
+[Interface]
+# Private key for THIS peer — generate once with `wg genkey`, keep it 0600.
+PrivateKey = {{WG_PRIVATE_KEY}}
+# The tunnel address your provider assigned you.
+Address = {{WG_ADDRESS}}
+# Resolve DNS through the tunnel so lookups don't leak to your ISP.
+DNS = {{WG_DNS}}
+# Do NOT let wg-quick install a default route the normal way — the pf
+# kill-switch (pf-killswitch.conf) is what forces traffic through wg0 and
+# blocks everything else. Table = off keeps wg-quick from fighting pf.
+Table = off
+MTU = 1420
+
+[Peer]
+PublicKey = {{WG_PEER_PUBLIC_KEY}}
+# Provider endpoint (host:port). Rotate this to change exit location — the
+# nightly routine's vpn_rotate step swaps it from your provider's server list.
+Endpoint = {{WG_ENDPOINT}}
+# Route everything through the tunnel.
+AllowedIPs = 0.0.0.0/0, ::/0
+# Keep NAT mappings alive so the tunnel doesn't silently die behind CGNAT.
+PersistentKeepalive = 25

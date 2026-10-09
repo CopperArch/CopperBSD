@@ -1,0 +1,10 @@
+#!/bin/sh
+# copperarch-installer-x11-session — live-medium-only kiosk session. sddm
+# starts Xorg (KMS driver where the GPU has one, scfb/vesa framebuffer
+# otherwise, e.g. in a VM) and we run the installer as its only client.
+# Unlike the cage session this does not need a DRM device, so it also boots
+# on machines and VMs with no KMS-capable GPU.
+export QT_QPA_PLATFORM=xcb
+export XDG_CURRENT_DESKTOP=copperarch-installer
+LOG="${HOME:-/var/live}/copperarch-installer.log"
+exec dbus-run-session -- /usr/local/bin/copperarch-installer >>"$LOG" 2>&1

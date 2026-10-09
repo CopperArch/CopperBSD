@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=CopperBSD Dashboard
+GenericName=Control Center
+Comment=System status, applications, media and network for CopperBSD
+Exec=copper-dashboard
+Icon=copper-dashboard
+Terminal=false
+Categories=System;Monitor;Qt;KDE;
+Keywords=copperbsd;dashboard;status;media;system;
+StartupNotify=true

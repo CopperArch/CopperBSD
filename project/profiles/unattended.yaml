@@ -1,0 +1,46 @@
+meta:
+  installer: freebsd-media-setup-with-dash
+  note: |
+    Hands-off first-boot profile used by the unattended installer and the ISO.
+    VPN and Nextcloud are OFF here because they need YOUR secrets (WireGuard
+    keys / passwords) — the desktop, dashboard, and media jails come up with
+    zero interaction, then you fill in wg keys and flip use_vpn_stack/
+    use_nextcloud on and run ./rebuild. Everything here is non-secret.
+
+user: copper
+lan_ip: ""                 # auto-detected at first boot if blank
+lan_cidr: 192.168.1.0/24
+host_ip: ""
+jail_subnet: 10.17.0
+jail_release: 15.1-RELEASE
+timezone: Europe/London
+
+domain: ""
+jellyfin_public_url: ""
+nextcloud_domain: ""
+
+media_pool: /mnt/storage
+nextcloud_data: /mnt/nextcloud-data
+
+# secret-requiring stacks OFF for a truly hands-off first boot
+use_media_stack: true
+use_vpn_stack: false
+use_nextcloud: false
+use_dashboard: false      # CopperBSD ships a native Qt/KDE dashboard instead
+use_daily_routine: true
+use_alerts: false
+
+qbit_user: admin
+qbit_password: ""          # generated
+
+# left blank/disabled above; present so the schema validates
+nc_admin_user: admin
+nc_admin_password: ""
+nc_db_password: ""
+wg_private_key: ""
+wg_address: 10.2.0.2/32
+wg_dns: 10.2.0.1
+wg_peer_public_key: ""
+wg_endpoint: ""
+wg_endpoint_ip: ""
+wg_endpoint_port: "51820"
