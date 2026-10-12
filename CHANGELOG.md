@@ -5,6 +5,9 @@ merged to `main` gets the next patch number from
 `.github/workflows/bump-version.yml`, which also adds the change to this file.
 A change that edits `VERSION` itself (for a bigger jump) is left as it is.
 
+## 0.1.1 - 2026-10-12
+- Rename state dir to ~/.dbmedia (#1)
+
 ## 0.1.0 - 2026-10-09
 - First published version: FreeBSD 15.1 live ISO build, native Qt 6 graphical
   installer, five selectable desktops (KDE Plasma, GNOME, XFCE, Niri and
