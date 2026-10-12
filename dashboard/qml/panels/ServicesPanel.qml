@@ -9,21 +9,34 @@ Panel {
     property var d: ({})
     readonly property var v: d.vpn || {}
     readonly property var services: d.services || []
-    readonly property bool hasVpn: !!d.vpn && !v.error
-    readonly property bool bad: v.healthy !== "healthy" || !v.siblings_ok
+    // Three states: no VPN jail on this machine (rows hidden), a VPN jail
+    // still waiting for its WireGuard config, and a configured tunnel.
+    readonly property bool hasVpn: !!d.vpn && !v.error && v.installed !== false
+    readonly property bool needsConfig: hasVpn && v.configured === false
+    readonly property bool bad: !needsConfig && (v.healthy !== "healthy" || !v.siblings_ok)
     signal changeVpn()
     title: qsTr("Services & VPN")
 
     KV {
         visible: root.hasVpn
-        dot: root.bad ? "f" : ""
+        dot: root.needsConfig ? "w" : (root.bad ? "f" : "")
         k: qsTr("VPN")
-        v: root.v.provider || qsTr("not named")
-        v2: root.v.vpn_type || ""
+        v: root.needsConfig ? qsTr("not set up") : (root.v.provider || qsTr("not named"))
+        v2: root.needsConfig ? "" : (root.v.vpn_type || "")
+        stale: root.needsConfig
     }
-    KV { visible: root.hasVpn; tiny: true; k: qsTr("exit"); v: root.v.ip || "?"; v2: root.v.country || "" }
+    T {
+        visible: root.needsConfig
+        Layout.preferredWidth: root.bodyWidth
+        wrapMode: Text.Wrap
+        elide: Text.ElideNone
+        font.pixelSize: 12
+        color: Theme.dim
+        text: qsTr("qBittorrent, Sonarr and Radarr stay offline until the VPN has a WireGuard config. Paste the .conf file from your provider, or from your own server.")
+    }
+    KV { visible: root.hasVpn && !root.needsConfig; tiny: true; k: qsTr("exit"); v: root.v.ip || "?"; v2: root.v.country || "" }
     KV {
-        visible: root.hasVpn
+        visible: root.hasVpn && !root.needsConfig
         tiny: true
         k: qsTr("tunnel")
         v: (root.v.healthy || "?") + qsTr(" · route ") + (root.v.siblings_ok ? qsTr("bound ✓") : qsTr("BROKEN"))
@@ -40,11 +53,12 @@ Panel {
         spacing: 6
         Item { Layout.fillWidth: true }
         FixBtn {
+            visible: !root.needsConfig
             text: qsTr("Restart tunnel")
             tip: dash.fixInfo("vpn_rotate")
             onClicked: dash.runFixes([{ id: "vpn_rotate", args: {}, label: qsTr("Restart VPN tunnel") }], qsTr("Restarting the VPN tunnel…"))
         }
-        FixBtn { text: qsTr("Change VPN provider"); onClicked: root.changeVpn() }
+        FixBtn { text: root.needsConfig ? qsTr("Add a VPN") : qsTr("Change VPN provider"); onClicked: root.changeVpn() }
     }
 
     Sub { text: qsTr("endpoints") }

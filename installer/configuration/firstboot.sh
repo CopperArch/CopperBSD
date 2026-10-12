@@ -54,8 +54,10 @@ install_dashboard()
 {
     command -v copper-dashboard >/dev/null 2>&1 && return 0
     say "building the CopperBSD dashboard"
+    # dejavu: the dashboard's own fonts have no arrows or check marks; without
+    # a fallback font its button icons draw as empty boxes.
     pkg_install cmake ninja pkgconf qt6-base qt6-declarative qt6-svg \
-        kf6-kirigami kf6-qqc2-desktop-style kf6-kio kf6-breeze-icons || \
+        kf6-kirigami kf6-qqc2-desktop-style kf6-kio kf6-breeze-icons dejavu || \
         say "WARNING: dashboard build dependencies failed (see $LOG)"
     SRC="$SHARE/dashboard"
     BLD=/var/tmp/copper-dashboard-build

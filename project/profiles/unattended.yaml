@@ -1,13 +1,17 @@
 meta:
   installer: freebsd-media-setup-with-dash
   note: |
-    Hands-off first-boot profile used by copperbsd_firstboot. VPN and Nextcloud
-    are OFF here because they need YOUR details (a WireGuard config, passwords):
-    the media jails and the dashboard's backend come up with zero interaction,
-    then you add a VPN from the dashboard (VPN -> Change provider) or set
-    use_vpn_stack / use_nextcloud here and re-run the installer. Everything in
-    this file is non-secret; generated passwords are saved by the installer to
-    /root/.config/freebsd-media-setup/profile-used.yaml (root only).
+    Hands-off first-boot profile used by copperbsd_firstboot. The whole media
+    stack comes up with zero interaction, including the VPN jail and the
+    download apps behind it (qBittorrent, Sonarr, Radarr). Those three have NO
+    internet access until you give the VPN jail a WireGuard config: open the
+    dashboard, VPN -> Change provider, and paste the .conf file from your
+    provider (or your own server). Until then the kill-switch keeps them
+    offline rather than letting them use your real address.
+    Nextcloud is off; set use_nextcloud: true and re-run the installer to add
+    it. Everything in this file is non-secret; generated passwords are saved by
+    the installer to /root/.config/freebsd-media-setup/profile-used.yaml
+    (root only).
 
 user: copper
 lan_ip: ""                 # auto-detected at first boot if blank
@@ -24,9 +28,8 @@ nextcloud_domain: ""
 media_pool: /mnt/storage    # created on first boot (a zroot/media dataset)
 nextcloud_data: /mnt/nextcloud-data
 
-# secret-requiring stacks OFF for a truly hands-off first boot
 use_media_stack: true
-use_vpn_stack: false
+use_vpn_stack: true       # jails + kill-switch now; the WireGuard config later
 use_nextcloud: false
 use_dashboard: true       # the backend of CopperBSD's native dashboard
 use_daily_routine: true
