@@ -101,25 +101,18 @@ rebuild_dashboard()
     return $rc
 }
 
-# Re-run the media project with the profile first boot saved, so updated
-# scripts, templates and the nightly routine are actually deployed.
+# Re-run the media project so updated scripts, templates and the nightly
+# routine are actually deployed. Prefer the profile the installer itself saved
+# (root only; it holds the passwords it generated) over first boot's copy,
+# which has none of them.
 reapply_project()
 {
-    PROFILE="$SHARE/profile.yaml"
+    PROFILE=/root/.config/freebsd-media-setup/profile-used.yaml
+    [ -r "$PROFILE" ] || PROFILE="$SHARE/profile.yaml"
     [ -r "$PROFILE" ] || { say "no saved media profile — skipping the media-stack re-apply"; return 0; }
-    USERNAME=""
-    [ -r "$SHARE/firstboot.conf" ] && . "$SHARE/firstboot.conf"
-    [ -n "${USERNAME:-}" ] || { say "WARNING: no user recorded — skipping the media-stack re-apply"; return 1; }
-    say "re-applying the media stack for $USERNAME (this can take a few minutes)"
-    DOAS=/usr/local/etc/doas.conf
-    BAK=""
-    if [ -f "$DOAS" ]; then BAK="$DOAS.copperbsd-update"; cp -p "$DOAS" "$BAK"; fi
-    # The project installer escalates with doas; grant a rule for this run only.
-    printf 'permit nopass %s as root\n' "$USERNAME" > "$DOAS"
-    chmod 644 "$DOAS"
-    su -l "$USERNAME" -c "python3.12 $PROJ/install.py --cli --profile $PROFILE --yes" >>"$LOG" 2>&1
+    say "re-applying the media stack (this can take a few minutes)"
+    python3.12 "$PROJ/install.py" --cli --profile "$PROFILE" --yes >>"$LOG" 2>&1
     rc=$?
-    if [ -n "$BAK" ]; then mv -f "$BAK" "$DOAS"; else rm -f "$DOAS"; fi
     [ $rc -eq 0 ] || say "WARNING: the media-stack installer reported errors (see $LOG)"
     return $rc
 }

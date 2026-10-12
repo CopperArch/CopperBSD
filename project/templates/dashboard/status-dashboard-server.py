@@ -630,7 +630,10 @@ def fix_pkg_upgrade(args):
     return rc == 0, out[-3500:] or "pkg upgrade complete"
 
 
-# ── CopperBSD itself: update to the latest version on GitHub ────────────────
+# ── CopperBSD only: update the distribution to the latest version on GitHub ─
+# CopperBSD ships this project behind its own dashboard and installs an
+# updater at the path below. It does not exist on a plain FreeBSD install, so
+# both entry points report that and do nothing there.
 UPDATER = "/usr/local/libexec/copperbsd-update"
 
 

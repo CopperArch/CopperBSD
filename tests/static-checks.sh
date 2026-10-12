@@ -64,6 +64,19 @@ if grep -rqiE 'WebEngine|QtWebView|chromium|electron' dashboard/CMakeLists.txt d
 else ok "dashboard has no browser-engine dependency"; fi
 [ -f project/templates/dashboard/index.html ] && bad "old web dashboard page still present" || ok "old web dashboard page removed"
 
+echo "== media project: CopperBSD's step changes still match upstream =="
+if command -v python3 >/dev/null 2>&1; then
+    if python3 -c "
+import sys; sys.path.insert(0, 'project')
+from lib.steps import ORDER
+t = [title for title, _ in ORDER]
+assert 'Dashboard backend' in t and 'Media storage' in t, t
+assert not {'Konsole theme', 'Desktop dashboard', 'Storage auto-pooling'} & set(t), t
+" 2>/dev/null; then ok "project/lib/distro.py applies to project/lib/steps.py"
+    else bad "project/lib/distro.py is out of date with project/lib/steps.py"; fi
+fi
+[ -f project/UPSTREAM ] && ok "project/UPSTREAM records the synced version" || bad "project/UPSTREAM missing (run tools/sync-project.sh)"
+
 echo "== live overlay present =="
 for f in etc/copperarch-live \
          usr/local/etc/sddm.conf.d/copperarch-live.conf \

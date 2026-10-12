@@ -73,33 +73,6 @@ install_dashboard()
     env ASSUME_ALWAYS_YES=YES pkg delete -y cmake ninja >>"$LOG" 2>&1 || true
 }
 
-# Jails live on private 10.17.0.0/24 addresses. Without address translation
-# nothing in them can reach DNS or the package servers (pkg fails with
-# "Transient resolver failure"), so NAT them out through the default route.
-# The VPN kill-switch, when enabled later, layers its own rules on top.
-setup_jail_nat()
-{
-    EXT=$(route -n get default 2>/dev/null | awk '/interface:/{print $2}')
-    [ -n "$EXT" ] || { say "no default route -- cannot NAT the jails"; return 0; }
-    SUBNET=$(sed -n 's/^jail_subnet:[[:space:]]*//p' "$PROJ/profiles/unattended.yaml" | head -1)
-    SUBNET=${SUBNET:-10.17.0}
-    sysrc gateway_enable=YES pf_enable=YES pflog_enable=NO >>"$LOG" 2>&1
-    sysctl net.inet.ip.forwarding=1 >>"$LOG" 2>&1
-    if ! grep -q copperbsd-jail-nat /etc/pf.conf 2>/dev/null; then
-        cat >> /etc/pf.conf <<PF
-# copperbsd-jail-nat: let the media jails reach the network
-ext_if = "$EXT"
-nat on \$ext_if inet from ${SUBNET}.0/24 to any -> (\$ext_if)
-PF
-    fi
-    kldload -n pf >>"$LOG" 2>&1 || true
-    if pfctl -si 2>/dev/null | grep -q Enabled; then
-        pfctl -f /etc/pf.conf >>"$LOG" 2>&1
-    else
-        pfctl -e -f /etc/pf.conf >>"$LOG" 2>&1 || service pf onestart >>"$LOG" 2>&1
-    fi
-}
-
 # -- media stack -------------------------------------------------------------
 setup_media_stack()
 {
@@ -114,25 +87,16 @@ setup_media_stack()
         sysrc cloned_interfaces+="bridge0" ifconfig_bridge0_name="bastille0" >>"$LOG" 2>&1
         ifconfig bridge0 create name bastille0 >>"$LOG" 2>&1
     fi
-    setup_jail_nat
-    # The project installer escalates with doas; grant the user a rule only for
-    # the length of this run.
-    printf 'permit nopass %s as root\n' "$USERNAME" > /usr/local/etc/doas.conf
-    chmod 644 /usr/local/etc/doas.conf
-    # The project's hands-off profile (VPN/Nextcloud/web dashboard off) with
-    # this machine's LAN address filled in.
-    IF=$(route -n get default 2>/dev/null | awk '/interface:/{print $2}')
-    IP=$(ifconfig "$IF" inet 2>/dev/null | awk '/inet /{print $2; exit}')
-    sed -e "s|^lan_ip:.*|lan_ip: ${IP:-127.0.0.1}|" \
-        -e "s|^host_ip:.*|host_ip: ${IP:-127.0.0.1}|" \
-        -e "s|^user:.*|user: $USERNAME|" \
-        -e "s|^use_dashboard:.*|use_dashboard: true|" \
+    # The project's hands-off profile (VPN and Nextcloud off) with this
+    # machine's user filled in. The installer works out the LAN address, sets
+    # up address translation for the jails, and runs as root: it writes pf
+    # rules, jail configs and root's crontab, then hands the dashboard's files
+    # to $USERNAME.
+    sed -e "s|^user:.*|user: $USERNAME|" \
         "$PROJ/profiles/unattended.yaml" > "$PROFILE"
     chmod 644 "$PROFILE"
-    su -l "$USERNAME" -c \
-        "python3.12 $PROJ/install.py --cli --profile $PROFILE --yes" \
+    python3.12 "$PROJ/install.py" --cli --profile "$PROFILE" --yes \
         >>"$LOG" 2>&1 || say "WARNING: the media-stack installer reported errors (see $LOG)"
-    rm -f /usr/local/etc/doas.conf
 }
 
 # -- display ------------------------------------------------------------------
