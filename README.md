@@ -139,6 +139,28 @@ session. `./test.sh` gives 49 passed, 1 failed in this checkout — the failing
 check is the vendored `freebsd/src-pinned/` subset, which is not included here
 (the build fetches the source at the pinned commit).
 
+**Update, 2026-10-12 — the installed system, run for real.** Everything below
+was run on FreeBSD 15.1-RELEASE (ZFS root, QEMU/KVM), staged the way the
+installer stages it and driven by the real `copperbsd_firstboot` functions:
+
+| Thing | Result |
+|---|---|
+| First-boot media install, from a pristine system | every step OK: host packages, Bastille, jail NAT, `zroot/media`, six media jails, Seerr built from source, VPN jail + qBittorrent/Sonarr/Radarr, nightly routine, dashboard backend |
+| Every app answers on its jail address | Jellyfin, Plex, Prowlarr, Bazarr, Seerr, Caddy, qBittorrent, Sonarr, Radarr |
+| A second disk in the machine | left untouched |
+| No VPN config yet | the three download jails have no internet access at all |
+| VPN added through the dashboard's API (WireGuard, with a pre-shared key) | tunnel up; the download jails reach the internet through it, including name lookups and a 9 MB download |
+| Tunnel taken down | the download jails are cut off again; everything else stays online |
+| Reboot | all ten jails, both firewall layers and the tunnel come back by themselves |
+| Installer run again | converges without rebuilding Seerr or dropping the kill-switch; repairs jails an interrupted run left without their packages |
+| Nightly routine, full pass | 42 OK, 0 warnings, 0 failures; pre-upgrade snapshots taken |
+| Native dashboard | compiles and installs; on a virtual display it shows the live system as "all systems OK"; restart-a-jail, restart-the-tunnel, change-schedule and update-check all work through it |
+| `./test.sh` static checks | 62 passed, 0 failed |
+
+Not run: the graphical installer writing to a disk, the desktop download, the
+dashboard on a real screen, a real commercial VPN provider (the test used a
+WireGuard server of its own), Nextcloud, and public access.
+
 ## §18 acceptance report
 
 1. **FreeBSD source commit:** `e38a7085f3a8ecd317c947591fe42b5ca9ab317b` (`releng/15.1`, GitHub mirror; `git.FreeBSD.org` is proxy-blocked here — see `freebsd/SOURCE.md`).

@@ -134,14 +134,20 @@ def install_dashboard_backend(ctx, accept) -> tuple[bool, str]:
         c.sudo.run(["chown", "-R", f"{user}:{user}", str(home / ".local"),
                     str(home / ".config")], timeout=60)
 
-        # Collector: the desktop user's crontab, once a minute.
+        # Collector: ROOT's crontab, once a minute. Everything it reports
+        # about a jail comes from `bastille cmd`, which only root may run;
+        # DASHBOARD_HOME points it at the desktop user's data directory.
+        # (Earlier CopperBSD versions ran it from the user's own crontab.)
         _drop_cron_lines(c, user, ("status-collect.py", "daily-routine.sh"),
                          exact=("# freebsd-media-setup",))
-        collect = f"{bin_dir}/status-collect.py"
+        c.plat.crontab_user(c.sudo, [], user, tag="dashboard-collector")
+        collect = (f"env DASHBOARD_HOME={home} python3.12 "
+                   f"{bin_dir}/status-collect.py")
         cron_ok = c.plat.crontab_user(
-            c.sudo, [f"* * * * * {collect} >/dev/null 2>&1"], user,
-            tag="dashboard-collector")
-        c.sudo.run(["su", "-l", user, "-c", collect], timeout=180, quiet=True)
+            c.sudo, [f"* * * * * {collect} >/dev/null 2>&1  # status-dashboard collector"],
+            "root", tag="dashboard-collector")
+        c.sudo.run(["sh", "-c", f"({collect}) < /dev/null > /dev/null 2>&1 &"],
+                   timeout=30)
 
         # Repair server: ROOT's crontab, as a watchdog. Its whitelisted fixes
         # restart jails, upgrade packages and update CopperBSD itself, none of
