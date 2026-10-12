@@ -44,6 +44,11 @@ jobs:
 
       - name: Validate the ISO
         run: |
+          # the runner's GNU tar cannot read an ISO; bsdtar can
+          command -v bsdtar >/dev/null 2>&1 || {
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq --no-install-recommends libarchive-tools
+          }
           sh tests/iso-validate.sh build/output/*.iso
 
       - name: Upload ISO + checksum
