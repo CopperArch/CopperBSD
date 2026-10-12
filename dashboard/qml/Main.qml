@@ -7,17 +7,22 @@ import CopperDashboard
 Kirigami.ApplicationWindow {
     id: root
     title: qsTr("CopperBSD Dashboard")
-    width: 1180
-    height: 760
+    width: 1500
+    height: 900
     minimumWidth: 640
     minimumHeight: 480
     visible: true
 
-    // One page at a time: this is a control centre, not a multi-column app.
+    // One page at a time: the dashboard, or one of the pages under "More".
     pageStack.columnView.columnResizeMode: Kirigami.ColumnView.SingleColumn
-    pageStack.globalToolBar.style: Kirigami.ApplicationHeaders.None
+    pageStack.globalToolBar.style: Kirigami.ApplicationHeaderStyle.None
 
-    Component { id: homePage;    HomePage {} }
+    // The web dashboard's two typefaces, bundled so every edition looks alike.
+    FontLoader { source: "qrc:/qt/qml/CopperDashboard/assets/fonts/Rajdhani-Regular.ttf" }
+    FontLoader { source: "qrc:/qt/qml/CopperDashboard/assets/fonts/Rajdhani-Bold.ttf" }
+    FontLoader { source: "qrc:/qt/qml/CopperDashboard/assets/fonts/Orbitron.ttf" }
+
+    Component { id: dashboardPage; DashboardPage {} }
     Component { id: appsPage;    AppsPage {} }
     Component { id: mediaPage;   MediaPage {} }
     Component { id: networkPage; NetworkPage {} }
@@ -27,13 +32,15 @@ Kirigami.ApplicationWindow {
     readonly property var settingsIds: ["systemsettings", "kde-systemsettings", "org.kde.systemsettings"]
     readonly property var terminalIds: ["org.kde.konsole", "konsole"]
     readonly property var softwareIds: ["org.kde.discover", "org.kde.discover.urlhandler"]
+    property bool onDashboard: true
 
     function go(component) {
+        onDashboard = component === dashboardPage
         pageStack.clear()
         pageStack.push(component)
     }
     // Navigation entry points for pages (ids are not visible across files).
-    function goHome()    { go(homePage) }
+    function goHome()    { go(dashboardPage) }
     function goApps()    { go(appsPage) }
     function goMedia()   { go(mediaPage) }
     function goNetwork() { go(networkPage) }
@@ -44,57 +51,48 @@ Kirigami.ApplicationWindow {
     function openSoftware() { apps.launchFirst(softwareIds) }
     function hasSoftware()  { return apps.firstInstalled(softwareIds) !== "" }
 
-    Component.onCompleted: go(homePage)
-
-    background: Item {
-        Rectangle { anchors.fill: parent; color: Theme.window }
-        Image {
-            anchors.fill: parent
-            source: "qrc:/qt/qml/CopperDashboard/assets/background.jpg"
-            fillMode: Image.PreserveAspectCrop
-            asynchronous: true
-        }
-        Rectangle { anchors.fill: parent; color: Theme.window; opacity: 0.84 }
+    Component.onCompleted: {
+        go(dashboardPage)
+        // Fills the screen like the web dashboard does; --windowed keeps the default size.
+        if (!Qt.application.arguments.includes("--windowed"))
+            showMaximized()
     }
 
-    globalDrawer: Kirigami.GlobalDrawer {
-        id: drawer
-        modal: false
-        collapsible: true
-        collapsed: root.width < 900
-        width: 260
-        Kirigami.Theme.inherit: false
-        Kirigami.Theme.colorSet: Kirigami.Theme.Complementary
+    background: Rectangle {
+        gradient: Gradient {
+            GradientStop { position: 0; color: "#111b2b" }
+            GradientStop { position: 0.45; color: Theme.bg }
+            GradientStop { position: 1; color: "#0c141d" }
+        }
+        // Faint badge behind everything, as on the web dashboard.
+        Image {
+            anchors.centerIn: parent
+            width: Math.min(parent.width * 0.48, 620)
+            height: width
+            source: "qrc:/qt/qml/CopperDashboard/assets/logo.png"
+            fillMode: Image.PreserveAspectFit
+            opacity: 0.045
+            smooth: true
+        }
+    }
 
-        header: Kirigami.AbstractApplicationHeader {
-            contentItem: RowLayout {
-                anchors.fill: parent
-                anchors.margins: Kirigami.Units.smallSpacing
-                spacing: Kirigami.Units.smallSpacing
-                Image {
-                    source: "qrc:/qt/qml/CopperDashboard/assets/logo.png"
-                    fillMode: Image.PreserveAspectFit
-                    Layout.preferredHeight: 40
-                    Layout.preferredWidth: 36
-                    smooth: true
-                }
-                Kirigami.Heading {
-                    visible: !drawer.collapsed
-                    text: qsTr("CopperBSD")
-                    level: 2
-                    Layout.fillWidth: true
-                }
+    // Only the pages under "More" get this bar; the dashboard has its own header.
+    header: Rectangle {
+        visible: !root.onDashboard
+        height: visible ? 44 : 0
+        color: Theme.panel
+        RowLayout {
+            anchors { fill: parent; leftMargin: 14; rightMargin: 14 }
+            spacing: 12
+            FixBtn { text: qsTr("← Dashboard"); onClicked: root.goHome() }
+            Text {
+                text: root.pageStack.currentItem ? root.pageStack.currentItem.title : ""
+                color: Theme.dim
+                font.family: Theme.mono; font.pixelSize: 13; font.bold: true
+                font.capitalization: Font.AllUppercase; font.letterSpacing: 1.2
+                Layout.fillWidth: true
             }
         }
-        actions: [
-            Kirigami.Action { text: qsTr("Home");     icon.name: "go-home";                    onTriggered: root.go(homePage) },
-            Kirigami.Action { text: qsTr("Apps");     icon.name: "view-list-icons";            onTriggered: root.go(appsPage) },
-            Kirigami.Action { text: qsTr("Media");    icon.name: "applications-multimedia";    onTriggered: root.go(mediaPage) },
-            Kirigami.Action { text: qsTr("Files");    icon.name: "folder-open";                onTriggered: apps.openHome() },
-            Kirigami.Action { text: qsTr("Network");  icon.name: "network-wired";              onTriggered: root.go(networkPage) },
-            Kirigami.Action { text: qsTr("System");   icon.name: "computer";                   onTriggered: root.go(systemPage) },
-            Kirigami.Action { text: qsTr("Updates");  icon.name: "system-software-update";     onTriggered: root.go(updatesPage) },
-            Kirigami.Action { text: qsTr("Settings"); icon.name: "preferences-system";         onTriggered: root.openSettings() }
-        ]
+        Rectangle { anchors { left: parent.left; right: parent.right; bottom: parent.bottom } height: 1; color: Theme.edge }
     }
 }

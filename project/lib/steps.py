@@ -248,13 +248,18 @@ def install_daily_routine(ctx: Ctx, accept) -> tuple[bool, str]:
     return _exec(ctx, "install daily routine", do)
 
 
-# ── 6. dashboard (loopback HTTP + collector + KWin below-layer window) ───────
+# ── 6. dashboard backend (collector + repair server for the native app) ─────
 def install_dashboard(ctx: Ctx, accept) -> tuple[bool, str]:
+    """CopperBSD's dashboard is the native copper-dashboard app; this installs
+    what it talks to: the status collector (writes status.json every minute)
+    and the loopback repair server that runs the whitelisted fixes."""
     if not ctx.profile.use_dashboard:
         return True, "dashboard disabled in profile"
-    if not accept("Install the KDE desktop status dashboard?"):
+    if not accept("Install the dashboard's status collector and repair server?"):
         return False, "declined"
     def do(c):
+        import shlex
+        from .profile import vpn_label
         home = Path(c.v["HOME"])
         src = c.tpl / "dashboard"
         bin_dir = home / ".local/bin"
@@ -264,13 +269,9 @@ def install_dashboard(ctx: Ctx, accept) -> tuple[bool, str]:
             d.mkdir(parents=True, exist_ok=True)
 
         # Scripts + python modules -> ~/.local/bin, rendering {{MEDIA_POOL}} etc.
-        # (data source is bastille/jls; the KWin below-layer rule is identical
-        # because KDE Plasma uses the same KWin the Linux edition targeted.)
         for f in sorted(src.iterdir()):
             if f.suffix in (".py", ".sh"):
                 render_file(f, bin_dir / f.name, c.v, mode=0o755)
-        # The page carries no {{TOKENS}} — copy it verbatim, 644.
-        render_file(src / "index.html", share / "index.html", c.v, mode=0o644)
 
         # Seed config: API keys (blank, chmod 600) + the VPN-confined group,
         # kept in sync with stack.yaml so collector and repair server agree.
@@ -286,31 +287,37 @@ def install_dashboard(ctx: Ctx, accept) -> tuple[bool, str]:
         if not grp.exists():
             grp.write_text('{"hub": "vpn", '
                            '"members": ["qbittorrent", "sonarr", "radarr"]}\n')
+        # Name of the active VPN for the dashboard's VPN card (the Change VPN
+        # provider dialog rewrites it when the config is replaced).
+        label = vpn_label(c.profile.vpn_provider, c.profile.wg_endpoint)
+        if label:
+            (conf / "vpn-name").write_text(label + "\n")
 
-        # AI panes: OpenRouter key (blank) + model slugs managed by
-        # ai-panes-check.py; then run it once so model-pricing.json populates
-        # and the paid/free pane labels + prices are correct on first paint.
-        ds = conf / "deepseek.env"
-        if not ds.exists():
-            ds.write_text(
-                "# chmod 600. One OpenRouter key powers every online AI pane.\n"
-                "DEEPSEEK_API_KEY=\n"
-                "DEEPSEEK_BASE_URL=https://openrouter.ai/api/v1\n"
-                "# The block below is rewritten nightly by ai-panes-check.py.\n")
-            ds.chmod(0o600)
+        # Collector: this user's crontab, once a minute.
+        collect = f"{bin_dir}/status-collect.py"
+        cron_ok = c.plat.crontab_user(
+            [f"* * * * * {collect} >/dev/null 2>&1  # status-dashboard collector"])
+        run([collect], quiet=True)
+
+        # Repair server: ROOT's crontab, as a watchdog. Its whitelisted fixes
+        # restart jails, upgrade packages and update CopperBSD itself, none of
+        # which the desktop user can do. DASHBOARD_HOME tells it whose data
+        # directory to serve (as root, Path.home() would be /root).
+        launch = (f"pgrep -f status-dashboard-server.py >/dev/null 2>&1 || "
+                  f"env DASHBOARD_HOME={home} /usr/sbin/daemon -r -o {share}/server.log "
+                  f"python3.12 {bin_dir}/status-dashboard-server.py")
+        line = f"* * * * * {launch}  # copper-dashboard server watchdog"
         c.sudo.run(["sh", "-c",
-                    f"su -m {c.profile.user} -c '{bin_dir}/ai-panes-check.py' "
-                    f"|| {bin_dir}/ai-panes-check.py"], timeout=90)
-
-        # Idempotent installer: cron collector + server watchdog, ttyd, autostart,
-        # KWin rule. Best-effort — the collector/server work even if the desktop
-        # bits are skipped on a headless box.
-        rc = c.sudo.run(["sh", str(bin_dir / "status-dashboard-install.sh")],
-                        timeout=300)
-        return True, ("dashboard deployed to ~/.local/bin + ~/.local/share "
-                      f"(installer rc={rc.returncode}); fill API keys in "
-                      "~/.config/status-dashboard/media-keys.env")
-    return _exec(ctx, "install dashboard", do)
+                    "(crontab -l 2>/dev/null | grep -v 'copper-dashboard server watchdog'; "
+                    f"echo {shlex.quote(line)}) | crontab -"], timeout=30)
+        # Backgrounded and fully redirected: daemon(8) does not always detach
+        # from the invoking shell before returning, and a still-open pipe back
+        # to this process would hang the install.
+        c.sudo.run(["sh", "-c", f"({launch}) < /dev/null > /dev/null 2>&1 &"],
+                   timeout=30)
+        return cron_ok, ("collector + repair server installed (127.0.0.1:8099); "
+                         "fill API keys in ~/.config/status-dashboard/media-keys.env")
+    return _exec(ctx, "install dashboard backend", do)
 
 
 ORDER = [

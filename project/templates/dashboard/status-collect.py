@@ -2,8 +2,9 @@
 """
 status-collect.py — FreeBSD edition. Gathers host + jail state into one JSON
 blob for the desktop status dashboard, emitting the SAME schema the Linux
-edition's index.html consumes, so the page renders unchanged (the "Containers"
-panel now shows Bastille jails).
+edition's index.html consumes so the collector side needs no schema changes
+(the dashboard's "Jails (containers)" panel shows Bastille jails under this
+schema's "docker" key -- see collect_docker() below).
 
 Retargeted sources vs. the Linux edition:
   /proc/*            -> sysctl (kern.cp_time(s), vm.stats, kern.boottime, hw.*)
@@ -29,7 +30,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from status_keys import load_env, load_group, jail_ip
@@ -98,10 +99,20 @@ def sysctl(name, default=""):
     return out or default
 
 
-def http(url, headers=None, timeout=TIMEOUT, data=None, method=None):
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *a, **kw):
+        return None  # tell urlopen not to follow -- see http()'s follow_redirects
+
+
+_no_redirect_opener = urllib.request.build_opener(_NoRedirect)
+
+
+def http(url, headers=None, timeout=TIMEOUT, data=None, method=None,
+         follow_redirects=True):
     req = urllib.request.Request(url, data=data, method=method, headers=headers or {})
+    opener = urllib.request.urlopen if follow_redirects else _no_redirect_opener.open
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as r:
+        with opener(req, timeout=timeout) as r:
             return r.getcode(), r.read().decode("utf-8", "replace")
     except urllib.error.HTTPError as e:
         try:
@@ -283,11 +294,54 @@ def collect_disks():
     return {"filesystems": out}
 
 
+# ── hotplug drives (devd-flagged, not yet in any pool) ──────────────────────
+HOTPLUG_DIR = Path("/var/db/freebsd-media-setup/hotplug-disks")
+
+
+def collect_hotplug_drives():
+    """One marker file per disk devd saw attached since it was last claimed
+    (see templates/scripts/drive-hotplug.sh). Re-checks zpool membership here
+    too -- belt-and-suspenders in case a marker survived a pool-add that
+    didn't get to clean up after itself."""
+    if not HOTPLUG_DIR.is_dir():
+        return []
+    claimed = set(run(["zpool", "status"], timeout=15).split())
+    names = []
+    for f in sorted(HOTPLUG_DIR.iterdir()):
+        if f.is_file() and f.name not in claimed:
+            names.append(f.name)
+    return names
+
+
 # ── jails (the docker collector, retargeted) ────────────────────────────────
 def _running_jails():
     """Names of currently-running jails (jls is authoritative)."""
     raw = run(["jls", "-N", "name"], timeout=15) or run(["jls", "name"], timeout=15)
     return set(raw.split())
+
+
+# Jails whose main package isn't named after the jail.
+_JAIL_PKG_HINT = {"plex": "plexmediaserver", "nextcloud-db": "postgresql",
+                  "vpn": "wireguard-tools"}
+
+
+def _jail_version(j):
+    """Installed version of the jail's main package, for the dashboard's
+    click-the-dot reveal. Best effort: '' when pkg can't say."""
+    try:
+        raw = jexec(j, ["pkg", "query", "%n\t%v"], timeout=12) or ""
+    except Exception:  # noqa: BLE001
+        return ""
+    want = _JAIL_PKG_HINT.get(j, re.sub(r"[^a-z0-9]", "", j.lower()))
+    best = ""
+    for line in raw.splitlines():
+        name, _, ver = line.partition("\t")
+        if ver and re.sub(r"[^a-z0-9]", "", name.lower()).startswith(
+                re.sub(r"[^a-z0-9]", "", want)):
+            # shortest matching name = the app itself, not a plugin of it
+            if not best or len(name) < len(best[0]):
+                best = (name, ver)
+    return best[1] if best else ""
 
 
 def collect_docker():
@@ -313,6 +367,7 @@ def collect_docker():
             "status": "up" if up else "stopped",
             "image": j, "since": "", "health": health,
             "restarts": 0, "cpu": None, "mem": None, "mem_pct": None,
+            "version": _jail_version(j) if up else "",
         })
     lst = sorted(containers, key=lambda c: c["name"])
     return {
@@ -331,17 +386,30 @@ def collect_vpn():
     'healthy' == 'healthy' when the tunnel's exit IP differs from the host WAN.
     'siblings' are the confined jails; 'bound' means their default route is the
     vpn jail (the FreeBSD analogue of sharing gluetun's netns)."""
-    info = {"ip": None, "country": None, "city": None, "healthy": None,
-            "siblings": [], "siblings_ok": True}
+    info = {"provider": None, "vpn_type": "WireGuard",
+            "ip": None, "country": None, "city": None, "healthy": None,
+            "siblings": [], "siblings_ok": True, "configured": True}
+    # Which VPN this is: written by the installer and by the dashboard's
+    # Change VPN provider dialog.
+    try:
+        info["provider"] = (Path.home() / ".config/status-dashboard/vpn-name"
+                            ).read_text().strip() or None
+    except OSError:
+        pass
 
     if GROUP_HUB not in _running_jails():
         info["healthy"] = "hub down"
         info["siblings_ok"] = False
         return info
 
-    # wg handshake present?
-    wg = jexec(GROUP_HUB, ["wg", "show"], timeout=12)
-    handshake = "latest handshake" in wg and "0 seconds ago" not in wg.split("latest handshake")[-1][:0]
+    info["configured"] = Path(f"/usr/local/bastille/jails/{GROUP_HUB}/root"
+                              "/usr/local/etc/wireguard/wg0.conf").exists()
+
+    # Health is decided by the exit-IP comparison below -- the same
+    # "trust the tunnel, not the wrapper" rule daily-routine.sh uses. (An
+    # earlier draft also parsed wg's handshake age here, but the check was
+    # dead code -- its second operand sliced to an empty string and the
+    # result was never consumed.)
     exit_ip = jexec(GROUP_HUB, ["fetch", "-qo", "-", "https://api.ipify.org"], timeout=15).strip()
     host_ip = run(["fetch", "-qo", "-", "https://api.ipify.org"], timeout=15).strip()
     info["ip"] = exit_ip or None
@@ -543,7 +611,13 @@ def collect_media():
 def probe(item):
     label, url, ok_codes = item
     t0 = time.time()
-    code, _ = http(url, timeout=6)
+    # Redirects must NOT be auto-followed here: several probes explicitly
+    # accept a 3xx as "alive" (Caddy's HTTP->HTTPS 308, Seerr/Bazarr's login
+    # redirects). Following them anyway used to mean the real response never
+    # got inspected at all -- a self-signed HTTPS cert on the other end (like
+    # Caddy's own local CA) fails verification and turns a perfectly healthy
+    # 308 into a reported "no connection".
+    code, _ = http(url, timeout=6, follow_redirects=False)
     return {"name": label, "url": url, "code": code,
             "ok": code in ok_codes, "ms": int((time.time() - t0) * 1000)}
 
@@ -557,6 +631,87 @@ def collect_services():
 STATUS_RE = re.compile(r"\[(OK|WARN|FAIL|SKIP)\]\s*(.*)$")
 TS_RE = re.compile(r"^\[(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d)\]\s*(.*)$")
 BANNER_RE = re.compile(r"^=+\s*(.+?)\s*=+$")
+
+
+def _read_daily_routine_schedule():
+    """Return (frequency, hh, mm) for the nightly self-heal routine, or None.
+
+    Primary source: routine-schedule.json in the dashboard conf dir --
+    published (and chowned to this user) by the installer's
+    install_daily_routine step and by the repair server's
+    set_daily_routine_schedule(), which is where the schedule is actually
+    changed. The authoritative copy lives in ROOT's crontab, which a
+    user-run collector can never read, so the file is what makes live
+    schedule changes visible here at all. Fallback: parse the crontab tag
+    block directly -- only possible when running as root (the repair
+    server's recollect path), where `crontab -l` is root's own table."""
+    sched_file = Path.home() / ".config/status-dashboard/routine-schedule.json"
+    try:
+        data = json.loads(sched_file.read_text())
+        hh_s, mm_s = str(data["time"]).split(":")
+        hh, mm = int(hh_s), int(mm_s)
+        freq = data.get("frequency")
+        if freq in ("daily", "weekly", "monthly", "yearly") and 0 <= hh < 24 and 0 <= mm < 60:
+            return freq, hh, mm
+    except Exception:  # noqa: BLE001 -- missing/corrupt file just means "fall through"
+        pass
+    if os.geteuid() != 0:
+        return None
+    try:
+        p = subprocess.run(["crontab", "-l"], capture_output=True, text=True, timeout=10)
+    except Exception:  # noqa: BLE001
+        return None
+    if p.returncode != 0:
+        return None
+    begin, end = "# freebsd-media-setup:daily-routine BEGIN", "# freebsd-media-setup:daily-routine END"
+    inside = False
+    for line in p.stdout.splitlines():
+        stripped = line.strip()
+        if stripped == begin:
+            inside = True; continue
+        if stripped == end:
+            inside = False; continue
+        if inside and stripped and not stripped.startswith("#"):
+            parts = stripped.split()
+            if len(parts) < 5:
+                continue
+            mm, hh, dom, mon, dow = parts[:5]
+            try:
+                hh, mm = int(hh), int(mm)
+            except ValueError:
+                continue
+            if dom != "*" and mon != "*":
+                freq = "yearly"
+            elif dom != "*":
+                freq = "monthly"
+            elif dow != "*":
+                freq = "weekly"
+            else:
+                freq = "daily"
+            return freq, hh, mm
+    return None
+
+
+def _next_run_human(frequency, hh, mm):
+    now = datetime.now()
+    candidate = now.replace(hour=hh, minute=mm, second=0, microsecond=0)
+    if frequency == "weekly":
+        days_ahead = (6 - now.weekday()) % 7  # cron dow=0 (Sun); Sunday is weekday() 6
+        candidate += timedelta(days=days_ahead)
+        if candidate <= now:
+            candidate += timedelta(days=7)
+    elif frequency == "monthly":
+        candidate = candidate.replace(day=1)
+        if candidate <= now:
+            candidate = (candidate.replace(day=28) + timedelta(days=4)).replace(day=1)
+    elif frequency == "yearly":
+        candidate = candidate.replace(month=1, day=1)
+        if candidate <= now:
+            candidate = candidate.replace(year=candidate.year + 1)
+    else:
+        if candidate <= now:
+            candidate += timedelta(days=1)
+    return candidate.strftime("%Y-%m-%d %H:%M") + f" ({frequency})"
 
 
 def collect_daily_routine():
@@ -589,19 +744,28 @@ def collect_daily_routine():
             entries.append({"kind": "WARN", "section": section, "message": line[:200], "time": stamp})
     mtime = latest.stat().st_mtime
     age_h = (time.time() - mtime) / 3600.0
+    sched = _read_daily_routine_schedule()
+    if sched:
+        frequency, hh, mm = sched
+        next_run = _next_run_human(frequency, hh, mm)
+        schedule = {"frequency": frequency, "time": f"{hh:02d}:{mm:02d}"}
+    else:
+        next_run, schedule = DAILY_ROUTINE_NEXT_RUN, None
     return {"log": str(latest),
             "ran_at": datetime.fromtimestamp(mtime).isoformat(timespec="seconds"),
             "age_hours": round(age_h, 1), "stale": age_h > 26,
-            "next_run": DAILY_ROUTINE_NEXT_RUN, "counts": counts,
+            "next_run": next_run, "schedule": schedule, "counts": counts,
             "entries": entries, "history": [p.name for p in logs[-7:]]}
 
 
 # ── attention (fix ids retargeted: jail_*/service_*/pkg_upgrade/vpn_*) ───────
-def build_attention(host, disks, docker, vpn, services, media, routine):
+def build_attention(host, disks, docker, vpn, services, media, routine,
+                    hotplug_drives=None):
     failed, warning, todo = [], [], []
 
-    def add(bucket, source, message, action=None, fix=None):
-        bucket.append({"source": source, "message": message, "action": action, "fix": fix})
+    def add(bucket, source, message, action=None, fix=None, open_link=None):
+        bucket.append({"source": source, "message": message, "action": action,
+                       "fix": fix, "open": open_link})
 
     SERVICE_JAIL = {"qBittorrent": "qbittorrent", "Prowlarr": "prowlarr",
                     "Radarr": "radarr", "Sonarr": "sonarr", "Seerr": "seerr",
@@ -626,7 +790,17 @@ def build_attention(host, disks, docker, vpn, services, media, routine):
                 {"id": "jail_restart", "args": {"name": jn}, "label": f"Restart {jn}"} if jn else None)
 
     if isinstance(vpn, dict) and not vpn.get("error"):
-        if vpn.get("healthy") and vpn["healthy"] != "healthy":
+        if not vpn.get("configured", True):
+            add(todo, "vpn", "No WireGuard config set -- qBittorrent/Sonarr/Radarr "
+                "have no internet access until one is added (any provider works, "
+                "these three have real free tiers)",
+                open_link={"id": "protonvpn_wg", "label": "Get ProtonVPN (free)"})
+            add(todo, "vpn", "Windscribe also has a genuine free WireGuard tier",
+                open_link={"id": "windscribe_wg", "label": "Get Windscribe (free)"})
+            add(todo, "vpn", "Surfshark is a cheap paid option if you'd rather not "
+                "juggle a free tier's limits",
+                open_link={"id": "surfshark_wg", "label": "Get Surfshark"})
+        elif vpn.get("healthy") and vpn["healthy"] != "healthy":
             add(failed, "vpn", f"VPN tunnel is {vpn['healthy']} (exit IP not confirmed)",
                 "bastille cmd vpn wg show",
                 {"id": "vpn_rotate", "args": {}, "label": "Restart tunnel / rotate exit"})
@@ -638,7 +812,7 @@ def build_attention(host, disks, docker, vpn, services, media, routine):
                 {"id": "vpn_recreate", "args": {}, "label": "Restart the VPN jail group"})
         if vpn.get("country") and vpn["country"] != EXPECTED_VPN_COUNTRY:
             add(warning, "vpn", f"VPN exit is {vpn['country']}, expected {EXPECTED_VPN_COUNTRY}",
-                "wg-rotate.sh", {"id": "vpn_rotate", "args": {}, "label": "Rotate VPN exit IP"})
+                "bastille cmd vpn wg show", {"id": "vpn_rotate", "args": {}, "label": "Restart VPN tunnel"})
 
     for fs in (disks or {}).get("filesystems", []):
         if fs["percent"] >= 90:
@@ -667,7 +841,7 @@ def build_attention(host, disks, docker, vpn, services, media, routine):
     for b in cf.get("blocked", []):
         add(failed, "cloudflare",
             f"{b['host']} is blocking this VPN exit — Cloudflare {b['code']} ({b['reason']})",
-            "wg-rotate.sh  # then re-test indexers",
+            "restart the tunnel, then re-test indexers",
             {"id": "cloudflare_unblock", "args": {"host": b["host"]},
              "label": f"Rotate VPN exit and re-test ({b['host']})"})
     pw = (media or {}).get("prowlarr", {})
@@ -695,6 +869,12 @@ def build_attention(host, disks, docker, vpn, services, media, routine):
             add(bucket, f"daily-routine › {e['section']}", e["message"], None,
                 {"id": "daily_routine_quick", "args": {}, "label": "Re-run daily routine (quick)"})
 
+    for d in hotplug_drives or []:
+        add(todo, "storage", f"New drive detected: {d} (not yet in any pool)",
+            f"zpool add storage {d}",
+            {"id": "pool_add_drive", "args": {"disk": d},
+             "label": f"Add {d} to storage pool"})
+
     def dedupe(items):
         seen, o = set(), []
         for i in items:
@@ -717,6 +897,7 @@ def main():
     services = guard("services", collect_services)
     media = guard("media", collect_media)
     routine = guard("daily_routine", collect_daily_routine)
+    hotplug = guard("hotplug_drives", collect_hotplug_drives)
     attention = guard("attention", build_attention,
                       host if isinstance(host, dict) else {},
                       disks if isinstance(disks, dict) else {},
@@ -724,12 +905,14 @@ def main():
                       vpn if isinstance(vpn, dict) else {},
                       services if isinstance(services, list) else [],
                       media if isinstance(media, dict) else {},
-                      routine if isinstance(routine, dict) else {})
+                      routine if isinstance(routine, dict) else {},
+                      hotplug if isinstance(hotplug, list) else [])
     payload = {"generated_at": datetime.now().isoformat(timespec="seconds"),
                "generated_epoch": time.time(),
                "collect_seconds": round(time.time() - t0, 1),
                "host": host, "disks": disks, "docker": docker, "vpn": vpn,
                "services": services, "media": media, "daily_routine": routine,
+               "hotplug_drives": hotplug,
                "attention": attention}
     tmp = OUT_FILE.with_suffix(".json.tmp")
     tmp.write_text(json.dumps(payload, indent=1))

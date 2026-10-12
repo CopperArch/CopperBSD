@@ -161,6 +161,17 @@ env PAGER=cat freebsd-update --not-running-from-cron fetch install >>"$LOG" 2>&1
     && log "  [OK] freebsd-update applied" \
     || log "  [INFO] freebsd-update: nothing to do or needs reboot"
 
+# ─── 4b. Jellyfin duplicate removal (DELETES losing files) ─────────────────
+# Keeps the best copy of a movie/episode stored twice and deletes the rest;
+# skips itself until ~/.dbmedia/jellyfin-api-key exists — creating that file
+# is the opt-in.
+banner "Jellyfin Duplicate Removal"
+if [ -x "$ROOT/.local/bin/jellyfin-duplicates.py" ]; then
+    "$ROOT/.local/bin/jellyfin-duplicates.py" --apply 2>&1 | tee -a "$LOG"
+else
+    log "  [SKIP] jellyfin-duplicates.py not installed"
+fi
+
 # ─── 5. Log rotation guard (replaces docker log-cap check) ──────────────────
 banner "Log Hygiene"
 find "$LOGDIR" -type f -mtime +30 -delete 2>/dev/null

@@ -72,6 +72,46 @@ flow (Welcome · Language · Keyboard · Network · Disk · User · Summary · I
 On first boot of the installed system, the project's desktop + media stack come
 up automatically.
 
+## The dashboard
+
+![CopperBSD dashboard](docs/screenshots/dashboard.png)
+
+`copper-dashboard` (native Qt 6/QML, `dashboard/`) has the same layout and
+functions as the CopperArch Linux and FreeBSD dashboards — it is the same
+design drawn natively instead of in a browser:
+
+- **Header** — host, uptime, how fresh the data is, a verdict pill that
+  repairs whatever is failing when clicked, and **Refresh / Update / Reboot**.
+- **Panels** — Needs attention (with one-click fixes and "Fix all"), CPU &
+  memory, Thermals & fans, Jails, Storage, Media library, Services & VPN,
+  Daily routine. Four columns on a desktop, two or one in a narrow window.
+- **Repairs** — the same closed whitelist the other editions use (start or
+  restart a jail, restart the VPN group or tunnel, Prowlarr test-all,
+  Cloudflare unblock, `pkg upgrade`, quick routine pass), with a live log
+  and a two-click Cancel.
+- **Services & VPN** names the VPN that is active. **Change VPN provider**
+  takes a pasted WireGuard config from any provider *or from a WireGuard
+  server of your own* (pre-shared keys included) and an optional name for it.
+- **Update → Update CopperBSD** compares the installed version with the
+  latest on GitHub and, when asked, downloads it, replaces the media-server
+  project and the dashboard source, rebuilds the dashboard if it changed and
+  re-applies the media stack with your saved profile
+  (`/usr/local/libexec/copperbsd-update`; `--check` only looks).
+- **More** keeps the app launcher and the local System / Network pages.
+
+It talks over loopback HTTP to two pieces the media project installs: a
+collector (`status-collect.py`, every minute) and a root-run repair server
+(`status-dashboard-server.py`, `127.0.0.1:8099`). Without the media stack
+there is no data to show and the dashboard says so. The AI chat dock of the
+Linux edition is not part of the native app.
+
+**Tested how:** the dashboard is compiled and run on Linux (Debian, Qt 6.8,
+Kirigami 6.13) against a stand-in server with sample data — the screenshot
+above is from that run, as are checks of the narrow layouts, every dialog, the
+repair-log states and the no-backend state. It has **not** been built or run
+on FreeBSD, and the updater has only had its version check exercised (against
+the real repository); a real update on an installed system is untested.
+
 ## Honest status (this was authored in a Linux sandbox)
 
 Per the project's own rule: nothing below is claimed working unless it was run.

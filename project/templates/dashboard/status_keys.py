@@ -7,9 +7,17 @@ drift apart (the Linux edition's netns-group.json, renamed for what it is on
 FreeBSD: the jails whose default route is the vpn jail's tunnel).
 """
 import json
+import os
 from pathlib import Path
 
-CONF_DIR = Path.home() / ".config/status-dashboard"
+# DASHBOARD_HOME overrides Path.home() when the caller's own identity isn't
+# the desktop user's -- status-dashboard-server.py runs as root (its repair
+# actions need to restart jails/services/pkg, which the desktop user can't),
+# but its data still lives under that user's actual home directory, not
+# /root. status-collect.py and friends still just run as the desktop user,
+# so Path.home() is correct for them and this env var is never set.
+_HOME = Path(os.environ["DASHBOARD_HOME"]) if "DASHBOARD_HOME" in os.environ else Path.home()
+CONF_DIR = _HOME / ".config/status-dashboard"
 KEYS_FILE = CONF_DIR / "media-keys.env"
 GROUP_FILE = CONF_DIR / "vpn-group.json"
 

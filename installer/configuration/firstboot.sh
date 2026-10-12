@@ -126,7 +126,7 @@ setup_media_stack()
     sed -e "s|^lan_ip:.*|lan_ip: ${IP:-127.0.0.1}|" \
         -e "s|^host_ip:.*|host_ip: ${IP:-127.0.0.1}|" \
         -e "s|^user:.*|user: $USERNAME|" \
-        -e "s|^use_dashboard:.*|use_dashboard: false|" \
+        -e "s|^use_dashboard:.*|use_dashboard: true|" \
         "$PROJ/profiles/unattended.yaml" > "$PROFILE"
     chmod 644 "$PROFILE"
     su -l "$USERNAME" -c \
