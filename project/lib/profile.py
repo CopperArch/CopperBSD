@@ -23,6 +23,29 @@ def _gen_secret() -> str:
     return secrets.token_hex(16)
 
 
+# Endpoint host -> provider name, for labelling the VPN on the dashboard when
+# no name was given. Anything else is somebody's own server.
+VPN_HOST_NAMES = (
+    ("protonvpn", "Proton VPN"), ("windscribe", "Windscribe"),
+    ("whiskergalaxy", "Windscribe"), ("surfshark", "Surfshark"),
+    ("mullvad", "Mullvad"), ("nordvpn", "NordVPN"), ("ivpn", "IVPN"),
+    ("privateinternetaccess", "Private Internet Access"), ("airvpn", "AirVPN"),
+    ("torguard", "TorGuard"), ("expressvpn", "ExpressVPN"),
+)
+
+
+def vpn_label(name, endpoint):
+    """Name shown for the active VPN: the one given, else guessed from the
+    endpoint, else 'Custom VPN' (your own server or an unlisted provider)."""
+    if (name or "").strip():
+        return name.strip()[:40]
+    host = (endpoint or "").rsplit(":", 1)[0].lower()
+    for needle, label in VPN_HOST_NAMES:
+        if needle in host:
+            return label
+    return "Custom VPN" if host else ""
+
+
 @dataclass
 class Profile:
     # identity / network
@@ -53,6 +76,9 @@ class Profile:
     wg_endpoint: str = ""              # host:port
     wg_endpoint_ip: str = ""           # bare IP (for the pf kill-switch)
     wg_endpoint_port: str = "51820"
+    wg_preshared_key: str = ""         # optional; many self-hosted servers use one
+    vpn_provider: str = ""             # name shown on the dashboard ("Mullvad",
+                                       # "Home server"...); blank = guessed
     vpn_rotate_hourly: bool = True
     # components
     use_media_stack: bool = True
@@ -106,6 +132,8 @@ class Profile:
             "WG_ENDPOINT": ep,
             "WG_ENDPOINT_IP": ep_ip,
             "WG_ENDPOINT_PORT": ep_pt,
+            "WG_PSK_LINE": (f"PresharedKey = {self.wg_preshared_key}"
+                            if self.wg_preshared_key else "# (no pre-shared key)"),
         }
 
     def to_yaml(self) -> str:

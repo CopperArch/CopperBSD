@@ -40,6 +40,10 @@ wg_peer_public_key: ""          # provider server's public key
 wg_endpoint: "vpn.example.com:51820"
 wg_endpoint_ip: ""              # bare IP of that endpoint (for the pf killswitch)
 wg_endpoint_port: "51820"
+wg_preshared_key: ""            # optional (PresharedKey in the config, if any)
+vpn_provider: ""                # name the dashboard shows, e.g. "Mullvad" or
+                                # "Home server" (your own WireGuard server works
+                                # too); blank = guessed from the endpoint
 vpn_rotate_hourly: true
 
 # components (untick anything you don't want)

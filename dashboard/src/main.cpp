@@ -5,6 +5,7 @@
 #include <QQuickStyle>
 
 #include "AppCatalog.h"
+#include "Backend.h"
 #include "MediaStatus.h"
 #include "SystemInfo.h"
 
@@ -26,11 +27,13 @@ int main(int argc, char *argv[])
     SystemInfo system;
     AppCatalog apps;
     MediaStatus media;
+    Backend dash;
 
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty(QStringLiteral("sys"), &system);
     engine.rootContext()->setContextProperty(QStringLiteral("apps"), &apps);
     engine.rootContext()->setContextProperty(QStringLiteral("media"), &media);
+    engine.rootContext()->setContextProperty(QStringLiteral("dash"), &dash);
 
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed, &app,
                      [] { QCoreApplication::exit(1); }, Qt::QueuedConnection);

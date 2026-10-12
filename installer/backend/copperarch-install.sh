@@ -137,6 +137,13 @@ if [ -d /tmp/copperbsd-desktop ]; then
           /usr/local/etc/rc.d/copperbsd_firstboot
     [ -d /tmp/copperbsd-desktop/dashboard ] && \
         cp -a /tmp/copperbsd-desktop/dashboard /usr/local/share/copperbsd/dashboard
+    # Installed version + the updater behind the dashboard's Update button.
+    [ -f /tmp/copperbsd-desktop/VERSION ] && \
+        install -m 644 /tmp/copperbsd-desktop/VERSION /usr/local/share/copperbsd/VERSION
+    [ -f /tmp/copperbsd-desktop/copperbsd-update.sh ] && \
+        install -d /usr/local/libexec && \
+        install -m 555 /tmp/copperbsd-desktop/copperbsd-update.sh \
+            /usr/local/libexec/copperbsd-update
 fi
 cat > /usr/local/share/copperbsd/firstboot.conf <<FBCONF
 DESKTOP="$DESKTOP"
@@ -172,6 +179,9 @@ POST
         cp "$REPO/packages/desktops.conf" "$CHROOT/tmp/copperbsd-desktop/" 2>/dev/null || true
         cp "$REPO/installer/configuration/firstboot.sh" "$CHROOT/tmp/copperbsd-desktop/" || return 1
         [ -d "$REPO/dashboard" ] && cp -a "$REPO/dashboard" "$CHROOT/tmp/copperbsd-desktop/dashboard"
+        cp "$REPO/VERSION" "$CHROOT/tmp/copperbsd-desktop/" 2>/dev/null || true
+        cp "$REPO/installer/configuration/copperbsd-update.sh" \
+           "$CHROOT/tmp/copperbsd-desktop/" 2>/dev/null || true
         cp -a "$REPO/installer/configuration/desktop/." \
               "$CHROOT/tmp/copperbsd-desktop/" 2>/dev/null || true
     fi

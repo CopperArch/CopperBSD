@@ -22,7 +22,24 @@ qt_add_qml_module(copper-dashboard
         qml/components/Card.qml
         qml/components/Meter.qml
         qml/components/StatusDot.qml
-        qml/pages/HomePage.qml
+        qml/components/T.qml
+        qml/components/Dot.qml
+        qml/components/Bar.qml
+        qml/components/FixBtn.qml
+        qml/components/KV.qml
+        qml/components/Sub.qml
+        qml/components/Panel.qml
+        qml/components/Sheet.qml
+        qml/components/ThinScroll.qml
+        qml/panels/AttentionPanel.qml
+        qml/panels/HostPanel.qml
+        qml/panels/ThermalPanel.qml
+        qml/panels/JailsPanel.qml
+        qml/panels/StoragePanel.qml
+        qml/panels/MediaPanel.qml
+        qml/panels/ServicesPanel.qml
+        qml/panels/RoutinePanel.qml
+        qml/pages/DashboardPage.qml
         qml/pages/AppsPage.qml
         qml/pages/MediaPage.qml
         qml/pages/NetworkPage.qml
@@ -31,10 +48,14 @@ qt_add_qml_module(copper-dashboard
     RESOURCES
         assets/logo.png
         assets/background.jpg
+        assets/fonts/Rajdhani-Regular.ttf
+        assets/fonts/Rajdhani-Bold.ttf
+        assets/fonts/Orbitron.ttf
     SOURCES
         src/SystemInfo.h src/SystemInfo.cpp
         src/AppCatalog.h src/AppCatalog.cpp
         src/MediaStatus.h src/MediaStatus.cpp
+        src/Backend.h src/Backend.cpp
 )
 
 target_include_directories(copper-dashboard PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
