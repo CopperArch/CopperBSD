@@ -5,6 +5,9 @@ merged to `main` gets the next patch number from
 `.github/workflows/bump-version.yml`, which also adds the change to this file.
 A change that edits `VERSION` itself (for a bigger jump) is left as it is.
 
+## 0.1.3 - 2026-10-12
+- Fix the ISO validation step failing on good builds (#3)
+
 ## 0.1.2 - 2026-10-12
 - Dashboard rebuilt to match the Linux edition; update from GitHub; VPN naming (#2)
 
