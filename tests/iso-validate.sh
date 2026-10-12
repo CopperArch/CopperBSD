@@ -28,12 +28,16 @@ else
     exit 2
 fi
 
-l=$(list) || { echo "!! $LISTER could not list the ISO" >&2; exit 1; }
-n=$(printf '%s\n' "$l" | wc -l | tr -d ' ')
+# Listed to a file, not a variable piped into grep: `grep -q` stops reading at
+# the first match, and the shell then reports a write error for every check.
+LIST=$(mktemp "${TMPDIR:-/tmp}/iso-validate.XXXXXX")
+trap 'rm -f "$LIST"' EXIT INT TERM
+list > "$LIST" || { echo "!! $LISTER could not list the ISO" >&2; exit 1; }
+n=$(wc -l < "$LIST" | tr -d ' ')
 echo ">> listed $n entries with $LISTER"
 [ "$n" -gt 100 ] || { echo "!! only $n entries listed — not a full live image" >&2; exit 1; }
 
-has() { printf '%s\n' "$l" | grep -Eqi "$1"; }
+has() { grep -Eqi "$1" "$LIST"; }
 fail=0
 has '(^|/)boot/loader'        || { echo "!! no /boot/loader in ISO"; fail=1; }
 has '(^|/)boot/kernel/kernel' || { echo "!! no kernel in ISO"; fail=1; }
