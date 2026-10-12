@@ -15,7 +15,7 @@ PATH="/sbin:/bin:/usr/sbin:/usr/bin:/usr/local/sbin:/usr/local/bin"
 export PATH
 
 ROOT="{{HOME}}"
-LOGDIR="$ROOT/.hermes/maintenance-logs"
+LOGDIR="$ROOT/.dbmedia/maintenance-logs"
 LOG="$LOGDIR/daily-routine-$(date +%Y%m%d-%H%M%S).log"
 mkdir -p "$LOGDIR"
 
@@ -108,8 +108,8 @@ for attempt in 1 2 3; do
 done
 if [ "$TUN_OK" != true ]; then
     warn "  [FAIL] VPN tunnel would not come back after 3 restarts"
-    [ -x "$ROOT/.hermes/scripts/send-alert.py" ] && \
-        "$ROOT/.hermes/scripts/send-alert.py" "VPN tunnel down on $(hostname)" \
+    [ -x "$ROOT/.dbmedia/scripts/send-alert.py" ] && \
+        "$ROOT/.dbmedia/scripts/send-alert.py" "VPN tunnel down on $(hostname)" \
         >/dev/null 2>&1
     # Kill-switch means the torrent jail is already leak-safe (no fallback),
     # so we do NOT need to stop it — pf has already dropped its egress.
