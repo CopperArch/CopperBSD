@@ -20,7 +20,16 @@ jellyfin_public_url: ""
 
 # storage — host ZFS paths, nullfs-mounted read-only into Plex/Jellyfin and
 # read-write into the *arr/torrent jails.
-media_pool: /mnt/storage
+# Leave media_pool blank to auto-detect: the installer finds any disks that
+# aren't backing the OS pool and stripes them into one new pool at
+# /mnt/storage. Set it explicitly (e.g. /mnt/storage) to skip auto-detection
+# and use a pool/path you already created yourself.
+media_pool: ""
+# Optional EXTRA media storage carved out of the OS disk itself, as a
+# zroot/media dataset — used alongside media_pool, not instead of it (the OS
+# disk's own space already belongs to zroot, so there's no separate pool to
+# make here). Normally left blank and set interactively during install.
+media_pool_extra: ""
 nextcloud_data: /mnt/nextcloud-data
 
 # Nextcloud (replaces Immich — photos/files). Set a domain for public HTTPS via
@@ -37,9 +46,7 @@ wg_private_key: ""              # `wg genkey` value your provider issued you
 wg_address: 10.2.0.2/32         # tunnel address the provider assigned
 wg_dns: 10.2.0.1
 wg_peer_public_key: ""          # provider server's public key
-wg_endpoint: "vpn.example.com:51820"
-wg_endpoint_ip: ""              # bare IP of that endpoint (for the pf killswitch)
-wg_endpoint_port: "51820"
+wg_endpoint: "vpn.example.com:51820"   # host:port, verbatim from their config
 wg_preshared_key: ""            # optional (PresharedKey in the config, if any)
 vpn_provider: ""                # name the dashboard shows, e.g. "Mullvad" or
                                 # "Home server" (your own WireGuard server works
@@ -52,6 +59,8 @@ use_vpn_stack: true
 use_dashboard: true
 use_daily_routine: true
 use_alerts: false
+use_local_glm: false   # true = install ollama + GLM on this machine
+glm_model: auto        # auto | glm-4.7-flash | glm4:9b
 
 # secrets
 plex_claim: ""                  # claim.plex.tv token (optional, first run only)

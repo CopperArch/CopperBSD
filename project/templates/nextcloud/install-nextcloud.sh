@@ -18,6 +18,12 @@ NCDATA=/data/nextcloud-data          # nullfs mount inside the app jail
 PGDATA=/var/db/postgres/data17
 DB_HOST="{{NC_DB_HOST}}"
 APP_IP="{{NC_JAIL_IP}}"
+# Secrets arrive rendered inside the single-quoted assignments below (the
+# installer escapes any literal ' as '\''), then travel to psql/occ through
+# the environment and their own variables -- the VALUES are never
+# re-scanned by any shell, because a "$VAR" expansion's result is never
+# re-parsed. No character the user picked can break quoting or smuggle in
+# a substitution at any layer.
 DB_PASS='{{NC_DB_PASSWORD}}'
 ADMIN_USER='{{NC_ADMIN_USER}}'
 ADMIN_PASS='{{NC_ADMIN_PASSWORD}}'
@@ -30,14 +36,24 @@ occ() { bastille cmd "$APPJ" su -m www -c "php $WEBROOT/occ $*"; }
 say "initialising PostgreSQL in $DBJ"
 bastille cmd "$DBJ" sh -c "test -f $PGDATA/PG_VERSION || service postgresql initdb" || true
 # Listen on the jail's address and trust the app jail over the bridge.
-bastille cmd "$DBJ" sh -c "sysrc -f $PGDATA/../ >/dev/null 2>&1 || true"
 bastille cmd "$DBJ" sh -c "grep -q \"listen_addresses = '\\*'\" $PGDATA/postgresql.conf || echo \"listen_addresses = '*'\" >> $PGDATA/postgresql.conf"
 bastille cmd "$DBJ" sh -c "grep -q '$APP_IP/32' $PGDATA/pg_hba.conf || echo 'host nextcloud nextcloud $APP_IP/32 scram-sha-256' >> $PGDATA/pg_hba.conf"
 bastille cmd "$DBJ" service postgresql restart || bastille cmd "$DBJ" service postgresql start
 
-bastille cmd "$DBJ" su -m postgres -c \
-  "psql -tAc \"SELECT 1 FROM pg_roles WHERE rolname='nextcloud'\" | grep -q 1 || \
-   psql -c \"CREATE ROLE nextcloud LOGIN PASSWORD '$DB_PASS';\""
+# Role: create if missing, else converge the password onto the profile's.
+# The password reaches psql as a psql VARIABLE (-v) -- :'dbpass' expands to
+# a correctly SQL-quoted literal, so no shell or SQL quoting can be broken
+# by its contents. Converging on re-runs matters: `rebuild` (re)generates
+# a blank profile secret, and without the ALTER the database would keep a
+# password the saved profile no longer knows.
+if bastille cmd "$DBJ" su -m postgres -c \
+     "psql -tAc \"SELECT 1 FROM pg_roles WHERE rolname='nextcloud'\"" | grep -q 1; then
+    NC_DB_PASS="$DB_PASS" bastille cmd "$DBJ" su -m postgres -c \
+        "psql -v dbpass=\"\$NC_DB_PASS\" -c \"ALTER ROLE nextcloud LOGIN PASSWORD :'dbpass';\""
+else
+    NC_DB_PASS="$DB_PASS" bastille cmd "$DBJ" su -m postgres -c \
+        "psql -v dbpass=\"\$NC_DB_PASS\" -c \"CREATE ROLE nextcloud LOGIN PASSWORD :'dbpass';\""
+fi
 bastille cmd "$DBJ" su -m postgres -c \
   "psql -tAc \"SELECT 1 FROM pg_database WHERE datname='nextcloud'\" | grep -q 1 || \
    psql -c \"CREATE DATABASE nextcloud OWNER nextcloud;\""
@@ -50,12 +66,26 @@ if bastille cmd "$APPJ" su -m www -c "php $WEBROOT/occ status" 2>/dev/null | gre
     say "already installed — skipping maintenance:install"
 else
     say "running occ maintenance:install"
+    # Same env route: the secrets expand inside the jail's own shell into
+    # single argv elements -- never embedded in any intermediate shell
+    # string.
+    NC_ADMIN_USER="$ADMIN_USER" NC_ADMIN_PASS="$ADMIN_PASS" NC_DB_PASS="$DB_PASS" \
     bastille cmd "$APPJ" su -m www -c \
       "php $WEBROOT/occ maintenance:install \
          --database pgsql --database-host '$DB_HOST' --database-name nextcloud \
-         --database-user nextcloud --database-pass '$DB_PASS' \
-         --admin-user '$ADMIN_USER' --admin-pass '$ADMIN_PASS' \
+         --database-user nextcloud --database-pass \"\$NC_DB_PASS\" \
+         --admin-user \"\$NC_ADMIN_USER\" --admin-pass \"\$NC_ADMIN_PASS\" \
          --data-dir '$NCDATA'"
+fi
+
+# Converge the admin credential onto the profile on every run (the rebuild
+# contract): the WebUI can change it later, and a re-run re-asserts the
+# declared value -- which is what the saved profile records, so the two
+# can't drift apart silently.
+if ! NC_ADMIN_USER="$ADMIN_USER" NC_ADMIN_PASS="$ADMIN_PASS" \
+        bastille cmd "$APPJ" su -m www -c \
+        "php $WEBROOT/occ user:password \"\$NC_ADMIN_USER\" \"\$NC_ADMIN_PASS\""; then
+    say "  (could not sync admin password — does user '$ADMIN_USER' exist?)"
 fi
 
 # ── 3. Config: trusted domains, caches, region, pretty URLs ─────────────────

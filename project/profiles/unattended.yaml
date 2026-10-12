@@ -1,11 +1,13 @@
 meta:
   installer: freebsd-media-setup-with-dash
   note: |
-    Hands-off first-boot profile used by the unattended installer and the ISO.
-    VPN and Nextcloud are OFF here because they need YOUR secrets (WireGuard
-    keys / passwords) — the desktop, dashboard, and media jails come up with
-    zero interaction, then you fill in wg keys and flip use_vpn_stack/
-    use_nextcloud on and run ./rebuild. Everything here is non-secret.
+    Hands-off first-boot profile used by copperbsd_firstboot. VPN and Nextcloud
+    are OFF here because they need YOUR details (a WireGuard config, passwords):
+    the media jails and the dashboard's backend come up with zero interaction,
+    then you add a VPN from the dashboard (VPN -> Change provider) or set
+    use_vpn_stack / use_nextcloud here and re-run the installer. Everything in
+    this file is non-secret; generated passwords are saved by the installer to
+    /root/.config/freebsd-media-setup/profile-used.yaml (root only).
 
 user: copper
 lan_ip: ""                 # auto-detected at first boot if blank
@@ -19,14 +21,14 @@ domain: ""
 jellyfin_public_url: ""
 nextcloud_domain: ""
 
-media_pool: /mnt/storage
+media_pool: /mnt/storage    # created on first boot (a zroot/media dataset)
 nextcloud_data: /mnt/nextcloud-data
 
 # secret-requiring stacks OFF for a truly hands-off first boot
 use_media_stack: true
 use_vpn_stack: false
 use_nextcloud: false
-use_dashboard: false      # CopperBSD ships a native Qt/KDE dashboard instead
+use_dashboard: true       # the backend of CopperBSD's native dashboard
 use_daily_routine: true
 use_alerts: false
 
@@ -41,9 +43,7 @@ wg_private_key: ""
 wg_address: 10.2.0.2/32
 wg_dns: 10.2.0.1
 wg_peer_public_key: ""
-wg_endpoint: ""
-wg_endpoint_ip: ""
-wg_endpoint_port: "51820"
+wg_endpoint: ""                 # host:port, verbatim from the provider's config
 wg_preshared_key: ""            # optional (PresharedKey in the config, if any)
 vpn_provider: ""                # name the dashboard shows, e.g. "Mullvad" or
                                 # "Home server" (your own WireGuard server works

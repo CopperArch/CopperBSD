@@ -6,7 +6,11 @@ bootable live ISO. Boot the ISO → graphical installer → reboot → a FreeBSD
 system that already contains the project, running.
 
 This is a fork of `freebsd-media-setup-with-dash`, restructured as a distribution
-build. The media-server application is reused unchanged under `project/`.
+build. The media-server application under `project/` is a copy of that project,
+refreshed with `tools/sync-project.sh` rather than edited here; the few things
+CopperBSD does differently (its own dashboard, no automatic pooling of spare
+disks) are in `project/lib/distro.py`. `project/UPSTREAM` records the version
+the copy was taken from.
 
 **Version:** see [`VERSION`](VERSION) · [changelog](CHANGELOG.md)
 
@@ -155,7 +159,8 @@ check is the vendored `freebsd/src-pinned/` subset, which is not included here
 ```
 CopperBSD/
 ├── freebsd/            pinned FreeBSD 15.1 source subset + COMMIT + SOURCE.md
-├── project/            the media-server application (reused unchanged)
+├── project/            the media-server application (synced from upstream)
+├── tools/              sync-project.sh (refresh project/ from upstream)
 ├── installer/
 │   ├── frontend/       Qt 6/QML graphical installer
 │   ├── backend/        bsdinstall-driving install driver

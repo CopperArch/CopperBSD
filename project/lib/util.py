@@ -91,8 +91,13 @@ class Sudo:
 
         On FreeBSD, `sudo` may not be installed (base ships `doas`); fall back
         to it, and to bare exec if the installer is already running as root.
+        Raises RuntimeError up front when NO root path exists at all, so the
+        install stops with a clear message instead of every command failing
+        one by one with permission errors.
         """
-        self.validate()
+        ok, msg = self.validate()
+        if not ok:
+            raise RuntimeError(f"root access unavailable: {msg}")
         prefix = ["sudo", "-n"] if have("sudo") else (
                  ["doas"] if have("doas") else [])
         if os.geteuid() == 0:
