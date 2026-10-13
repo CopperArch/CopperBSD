@@ -5,6 +5,9 @@ merged to `main` gets the next patch number from
 `.github/workflows/bump-version.yml`, which also adds the change to this file.
 A change that edits `VERSION` itself (for a bigger jump) is left as it is.
 
+## 0.1.8 - 2026-10-13
+- project/UPSTREAM: point at merged freebsd-media-setup 0.6.8 (#8)
+
 ## 0.1.7 - 2026-10-13
 - README: say what it does, list the features, add dashboard screenshots (#7)
 
