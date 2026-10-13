@@ -198,11 +198,13 @@ reopened. Ctrl+` steps through the widths.
   can only choose from the fixed list in `dashboard-pane.sh` — it cannot
   pass a command.
 - The picker lists only what this machine can run. Out of the box that is
-  **Shell, Processes, Jail stats, System log, Dashboard log, Disk usage and
-  Daily routine**.
-- **Claude Code** appears once it is installed. FreeBSD packages it as a
-  Linux program, so it needs Linux binary support:
-  `sysrc linux_enable=YES && service linux start && pkg install claude-code`.
+  **Claude Code**, then **Shell, Processes, Jail stats, System log, Dashboard
+  log, Disk usage and Daily routine**.
+- **Claude Code** is installed with the media server (`pkg install
+  claude-code`; sign in the first time it opens). FreeBSD packages it as a
+  Linux program, so the installer also switches on Linux binary support
+  (`linux_enable=YES`), which downloads the Linux base system — about 600 MB
+  in all. If that fails the dock simply comes without the Claude Code pane.
 - **Ask** sends one question to Claude Code or, with an OpenRouter key in
   `~/.config/status-dashboard/deepseek.env`, to ChatGPT, Gemini, Hy4, GLM,
   DeepSeek, Minimax or Qwen, with the current price shown.
@@ -257,7 +259,7 @@ installer stages it and driven by the real `copperbsd_firstboot` functions:
 | Installer run again | converges without rebuilding Seerr or dropping the kill-switch; repairs jails an interrupted run left without their packages |
 | Nightly routine, full pass | 42 OK, 0 warnings, 0 failures; pre-upgrade snapshots taken |
 | Native dashboard | compiles and installs; on a virtual display it shows the live system as "all systems OK"; restart-a-jail, restart-the-tunnel, change-schedule and update-check all work through it |
-| Terminal dock | built with QtWebEngine 6.11 by the first-boot build; `ttyd` runs as the desktop user on loopback only; Shell and Jail stats panes open from the picker; Claude Code (from `pkg`, with Linux binary support switched on) starts in the dock and keeps running after **off**; a plain pane is gone the moment the dock is closed; Ask reaches Claude Code |
+| Terminal dock | built with QtWebEngine 6.11 by the first-boot build; `ttyd` runs as the desktop user on loopback only; Shell and Jail stats panes open from the picker; Claude Code is installed by the installer (removed first, to prove it), still there after a reboot, starts in the dock and keeps running after **off**; a plain pane is gone the moment the dock is closed; Ask reaches Claude Code |
 | `./test.sh` static checks | 71 passed, 0 failed |
 
 Not run: the graphical installer writing to a disk, the desktop download, the

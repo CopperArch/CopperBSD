@@ -93,7 +93,8 @@ def install_dashboard_backend(ctx, accept) -> tuple[bool, str]:
     """CopperBSD's dashboard is the native copper-dashboard app; this installs
     what it talks to: the status collector (writes status.json every 10 s),
     the loopback repair server that runs the whitelisted fixes, and ttyd, the
-    loopback terminal bridge behind the dashboard's terminal dock."""
+    loopback terminal bridge behind the dashboard's terminal dock, with
+    Claude Code to run in it."""
     if not ctx.profile.use_dashboard:
         return True, "dashboard disabled in profile"
     if not accept("Install the dashboard's status collector, repair server "
@@ -136,6 +137,20 @@ def install_dashboard_backend(ctx, accept) -> tuple[bool, str]:
         c.sudo.run(["pkg", "install", "-y", "bash", "ttyd", "tmux", "xclip",
                     "htop", "ncdu"],
                    timeout=600, env=dict(os.environ, ASSUME_ALWAYS_YES="YES"))
+        # Claude Code, the dock's first pane. FreeBSD packages it as a Linux
+        # program: it needs the Linux binary support switched on (the package
+        # refuses to install without it) and brings linux_base-rl9 with it.
+        # Best effort -- without it the dock still has its system panes, and
+        # the picker simply does not list Claude Code.
+        claude_note = ""
+        if not Path("/usr/local/bin/claude").exists():
+            c.sudo.run(["sysrc", "linux_enable=YES"], timeout=30, quiet=True)
+            c.sudo.run(["service", "linux", "start"], timeout=60, quiet=True)
+            p = c.sudo.run(["pkg", "install", "-y", "claude-code"], timeout=1800,
+                           env=dict(os.environ, ASSUME_ALWAYS_YES="YES"), quiet=True)
+            if p.returncode != 0:
+                claude_note = ("; Claude Code could NOT be installed (pkg install "
+                               "claude-code) -- the dock has its other panes")
         # One OpenRouter key powers every online AI pane; the model block
         # under it is kept current by ai-panes-check.py (nightly routine).
         ds = conf / "deepseek.env"
@@ -237,7 +252,7 @@ def install_dashboard_backend(ctx, accept) -> tuple[bool, str]:
                    timeout=30)
         return cron_ok and server_ok and ttyd_ok, (
             "collector + repair server (127.0.0.1:8099) and terminal dock "
-            "service (127.0.0.1:7682) installed; "
+            f"service (127.0.0.1:7682) installed{claude_note}; "
             "fill API keys in ~/.config/status-dashboard/media-keys.env")
     return _exec(ctx, "install dashboard backend", do)
 
