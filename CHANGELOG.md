@@ -5,6 +5,9 @@ merged to `main` gets the next patch number from
 `.github/workflows/bump-version.yml`, which also adds the change to this file.
 A change that edits `VERSION` itself (for a bigger jump) is left as it is.
 
+## 0.1.7 - 2026-10-13
+- README: say what it does, list the features, add dashboard screenshots (#7)
+
 ## 0.1.6 - 2026-10-13
 - Dashboard: real-time gauges and 10 s collection (#6)
 
