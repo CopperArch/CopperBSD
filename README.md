@@ -1,23 +1,78 @@
 # CopperBSD
 
-A custom operating-system distribution: **FreeBSD 15.1 + the CopperArch media
-server + a native graphical installer, built as one thing** and delivered as a
-bootable live ISO. Boot the ISO → graphical installer → reboot → a FreeBSD
-system that already contains the project, running.
+**A FreeBSD you install from a USB stick and end up with a working home
+media server.** CopperBSD is FreeBSD 15.1 with a graphical installer, your
+choice of desktop, and the CopperArch media server built in: streaming apps,
+download apps behind a WireGuard VPN with a kill-switch, a native dashboard,
+and a nightly routine that keeps the machine healthy.
 
-This is a fork of `freebsd-media-setup-with-dash`, restructured as a distribution
-build. The media-server application under `project/` is a copy of that project,
-refreshed with `tools/sync-project.sh` rather than edited here; the few things
-CopperBSD does differently (its own dashboard, no automatic pooling of spare
-disks) are in `project/lib/distro.py`. `project/UPSTREAM` records the version
-the copy was taken from.
-
+**Download:** the latest ISO is on the
+[releases page](https://github.com/CopperArch/CopperBSD/releases).
 **Version:** see [`VERSION`](VERSION) · [changelog](CHANGELOG.md)
+
+![The CopperBSD dashboard](docs/screenshots/dashboard.png)
+
+## What it does
+
+1. **Boot the ISO** and a graphical installer starts. Pick a desktop, a disk
+   and a user name.
+2. **Reboot** into FreeBSD with that desktop.
+3. **On first boot it sets up the media server by itself**: one jail per app,
+   the VPN jail and kill-switch, the nightly routine, and the dashboard.
+4. **Open the dashboard** to see everything, add your VPN, and fix problems
+   with one click.
+
+## Features
+
+**The system**
+- FreeBSD 15.1 on ZFS, delivered as a bootable live ISO (UEFI).
+- A native Qt 6 graphical installer; no text menus.
+- Five desktops to choose from: KDE Plasma, GNOME, XFCE, Niri and MangoWC.
+- An **Update** button that fetches the latest CopperBSD from GitHub and
+  applies it in place, keeping your media, settings and profile.
+
+**Media and downloads**
+- Jellyfin and Plex for streaming; Sonarr, Radarr and Prowlarr to find and
+  organise films and series; Bazarr for subtitles; qBittorrent to download;
+  Seerr for requests; Caddy as the reverse proxy.
+- Each app runs in its own jail, installed from FreeBSD's own packages.
+- A spare disk in the machine is never touched without you asking.
+
+**VPN**
+- Kernel WireGuard in a dedicated jail. Works with any provider that gives
+  you a WireGuard config, or with a server of your own.
+- The download apps are installed by default and stay **offline until you add
+  a VPN** from the dashboard. If the tunnel ever drops, a pf kill-switch cuts
+  them off; they never fall back to your real address.
+- **Change VPN provider** by pasting a new `.conf` file.
+
+**Dashboard** (a native app, not a web page)
+- CPU, memory, swap, temperatures and disks, live every 2 seconds.
+- Every jail, service, the VPN and the media library, refreshed every
+  10 seconds.
+- A **Needs attention** list with a **Fix** button next to each problem and a
+  **Fix all**. Fixes come from a fixed whitelist.
+- Refresh, Update and Reboot; a schedule dialog for the nightly run; an app
+  launcher and System / Network pages under **More**.
+
+**Self-healing**
+- Nightly: ZFS pool and disk health, stopped jails and services, the VPN
+  tunnel, package updates with a ZFS snapshot taken first, clean-up of old
+  downloads and caches.
 
 ## Screenshots
 
-The graphical installer, running from the live ISO in a QEMU/KVM virtual
-machine (UEFI, 2026-10-09).
+**The dashboard**
+
+| Changing VPN provider | Nightly schedule | More menu |
+|---|---|---|
+| ![Change VPN provider](docs/screenshots/dashboard-change-vpn.png) | ![Schedule dialog](docs/screenshots/dashboard-schedule.png) | ![More menu](docs/screenshots/dashboard-menu.png) |
+
+The dashboard screenshots were taken on FreeBSD 15.1 with the app fed
+demonstration data: host name, addresses and downloads are made up.
+
+**The installer**, running from the live ISO in a QEMU/KVM virtual machine
+(UEFI, 2026-10-09).
 
 | Welcome | Choose your desktop |
 |---|---|
@@ -26,6 +81,22 @@ machine (UEFI, 2026-10-09).
 | Installation destination | Create your account |
 |---|---|
 | ![Disk selection page](docs/screenshots/installer-destination.png) | ![Account page](docs/screenshots/installer-account.png) |
+
+## Related projects
+
+- [freebsd-media-setup-with-dash](https://github.com/CopperArch/freebsd-media-setup-with-dash):
+  the media server on its own, for an existing FreeBSD machine.
+- [CopperArch-Linux-Media](https://github.com/CopperArch/CopperArch-Linux-Media):
+  the same server on Linux, with Docker.
+
+## How it is put together
+
+CopperBSD is a fork of `freebsd-media-setup-with-dash`, restructured as a
+distribution build. The media-server application under `project/` is a copy
+of that project, refreshed with `tools/sync-project.sh` rather than edited
+here; the few things CopperBSD does differently (its own dashboard, no
+automatic pooling of spare disks) are in `project/lib/distro.py`.
+`project/UPSTREAM` records the version the copy was taken from.
 
 ## Build it (one command, no FreeBSD host required)
 
@@ -109,12 +180,11 @@ collector (`status-collect.py`, every 10 seconds; CPU, memory, swap and disks ar
 there is no data to show and the dashboard says so. The AI chat dock of the
 Linux edition is not part of the native app.
 
-**Tested how:** the dashboard is compiled and run on Linux (Debian, Qt 6.8,
-Kirigami 6.13) against a stand-in server with sample data — the screenshot
-above is from that run, as are checks of the narrow layouts, every dialog, the
-repair-log states and the no-backend state. It has **not** been built or run
-on FreeBSD, and the updater has only had its version check exercised (against
-the real repository); a real update on an installed system is untested.
+**Tested how:** the dashboard has been compiled and run on a real FreeBSD
+15.1 machine (a ZFS virtual machine with the full media stack installed), on
+a virtual display: the panels, the narrow layouts, the dialogs, the repairs
+and a real update from one version to the next. It has **not** been run on a
+physical screen.
 
 ## Honest status (this was authored in a Linux sandbox)
 
