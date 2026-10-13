@@ -5,6 +5,9 @@ merged to `main` gets the next patch number from
 `.github/workflows/bump-version.yml`, which also adds the change to this file.
 A change that edits `VERSION` itself (for a bigger jump) is left as it is.
 
+## 0.1.6 - 2026-10-13
+- Dashboard: real-time gauges and 10 s collection (#6)
+
 ## 0.1.5 - 2026-10-12
 - Media stack proven on FreeBSD 15.1: VPN by default, working kill-switch, clean dashboard (#5)
 
