@@ -16,6 +16,9 @@ Kirigami.Page {
 
     readonly property var d: dash.status
     readonly property var host: d.host || ({})
+    // d with the 2-second host gauges; for the panels that draw them
+    readonly property var live: dash.liveStatus
+    readonly property var liveHost: live.host || ({})
     // 4 columns on a desktop, 2 when squeezed, 1 in a narrow window — the
     // same three arrangements the web dashboard switches between.
     readonly property int cols: width >= 1250 ? 4 : width >= 700 ? 2 : 1
@@ -83,7 +86,7 @@ Kirigami.Page {
             }
             T {
                 visible: page.width >= 1100
-                text: page.host.uptime_seconds !== undefined ? qsTr("up ") + Theme.dur(page.host.uptime_seconds) : qsTr("up ") + sys.uptime
+                text: page.liveHost.uptime_seconds !== undefined ? qsTr("up ") + Theme.dur(page.liveHost.uptime_seconds) : qsTr("up ") + sys.uptime
                 color: Theme.dim; font.pixelSize: 12
             }
             Item { Layout.fillWidth: true }
@@ -192,7 +195,7 @@ Kirigami.Page {
                     Layout.minimumHeight: page.cols === 4 ? 120 : 260
                 }
                 HostPanel {
-                    d: page.d
+                    d: page.live
                     Layout.column: page.cols === 4 ? 2 : 0
                     Layout.row: page.cols === 4 ? 0 : 1
                     Layout.fillWidth: true; Layout.fillHeight: true
@@ -201,7 +204,7 @@ Kirigami.Page {
                     Layout.verticalStretchFactor: 100
                 }
                 ThermalPanel {
-                    d: page.d
+                    d: page.live
                     Layout.column: page.cols === 4 ? 3 : page.cols === 2 ? 1 : 0
                     Layout.row: page.cols === 4 ? 0 : page.cols === 2 ? 1 : 2
                     Layout.fillWidth: true; Layout.fillHeight: true
@@ -220,7 +223,7 @@ Kirigami.Page {
                     Layout.verticalStretchFactor: 90
                 }
                 StoragePanel {
-                    d: page.d
+                    d: page.live
                     Layout.column: 0
                     Layout.row: page.cols === 4 ? 2 : page.cols === 2 ? 3 : 4
                     Layout.fillWidth: true; Layout.fillHeight: true

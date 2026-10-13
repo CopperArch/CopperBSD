@@ -17,7 +17,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from .render import render_file
-from .steps import _exec
+from .steps import _exec, retire_old_dashboard_server
 
 # upstream step title -> dropped
 DROP = {"Desktop panel defaults", "Konsole theme", "Local AI (GLM)"}
@@ -134,8 +134,8 @@ def install_dashboard_backend(ctx, accept) -> tuple[bool, str]:
         c.sudo.run(["chown", "-R", f"{user}:{user}", str(home / ".local"),
                     str(home / ".config")], timeout=60)
 
-        # Collector: ROOT's crontab, once a minute. Everything it reports
-        # about a jail comes from `bastille cmd`, which only root may run;
+        # Collector: ROOT's crontab. Everything it reports
+        # about a jail comes from `jexec`, which only root may run;
         # DASHBOARD_HOME points it at the desktop user's data directory.
         # (Earlier CopperBSD versions ran it from the user's own crontab.)
         _drop_cron_lines(c, user, ("status-collect.py", "daily-routine.sh"),
@@ -143,8 +143,10 @@ def install_dashboard_backend(ctx, accept) -> tuple[bool, str]:
         c.plat.crontab_user(c.sudo, [], user, tag="dashboard-collector")
         collect = (f"env DASHBOARD_HOME={home} python3.12 "
                    f"{bin_dir}/status-collect.py")
+        # cron starts it once a minute; --loop has it collect every 10 s for
+        # that minute, so the dashboard is never more than seconds behind.
         cron_ok = c.plat.crontab_user(
-            c.sudo, [f"* * * * * {collect} >/dev/null 2>&1  # status-dashboard collector"],
+            c.sudo, [f"* * * * * {collect} --loop 60 10 >/dev/null 2>&1  # status-dashboard collector"],
             "root", tag="dashboard-collector")
         c.sudo.run(["sh", "-c", f"({collect}) < /dev/null > /dev/null 2>&1 &"],
                    timeout=30)
@@ -163,6 +165,7 @@ def install_dashboard_backend(ctx, accept) -> tuple[bool, str]:
         # Backgrounded and fully redirected: daemon(8) does not always detach
         # from the invoking shell before returning, and a still-open pipe back
         # to this process would hang the install.
+        retire_old_dashboard_server(c)
         c.sudo.run(["sh", "-c", f"({launch}) < /dev/null > /dev/null 2>&1 &"],
                    timeout=30)
         return cron_ok and server_ok, (

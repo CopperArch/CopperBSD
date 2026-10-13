@@ -8,7 +8,10 @@
 #include <QUrl>
 
 namespace {
-constexpr int kStatusMs = 30000;
+// status.json is rewritten every 10 s; asking every 2 s keeps the page within
+// a couple of seconds of each collection. /api/live is the cheap host reading.
+constexpr int kStatusMs = 2000;
+constexpr int kLiveMs = 2000;
 constexpr int kJobPollMs = 1500;
 const char *kDefaultBase = "http://127.0.0.1:8099";
 } // namespace
@@ -25,10 +28,13 @@ Backend::Backend(QObject *parent)
 
     connect(&m_statusTimer, &QTimer::timeout, this, &Backend::reload);
     m_statusTimer.start(kStatusMs);
+    connect(&m_liveTimer, &QTimer::timeout, this, &Backend::reloadLive);
+    m_liveTimer.start(kLiveMs);
     m_jobTimer.setInterval(kJobPollMs);
     connect(&m_jobTimer, &QTimer::timeout, this, &Backend::pollJob);
 
     reload();
+    reloadLive();
     checkUpdate();
     // A repair started before this window opened (or from another one) is
     // still worth showing: attach to it.
@@ -81,17 +87,63 @@ void Backend::reload()
     get(QStringLiteral("/status.json?_=%1").arg(QDateTime::currentMSecsSinceEpoch()),
         [this](int code, const QJsonObject &body, const QString &netError) {
             if (code == 200 && !body.isEmpty()) {
+                const double gen = body.value(QLatin1String("generated_epoch")).toDouble();
+                // Same collection as last time: nothing to redraw.
+                if (m_reachable && gen == m_generatedExact)
+                    return;
                 m_status = body.toVariantMap();
-                m_generated = qint64(body.value(QLatin1String("generated_epoch")).toDouble());
+                m_generatedExact = gen;
+                m_generated = qint64(gen);
                 m_reachable = true;
                 m_error.clear();
             } else {
+                const QString err = !netError.isEmpty() ? netError
+                                    : code == 200 ? tr("status.json is empty") : tr("HTTP %1").arg(code);
+                if (!m_reachable && err == m_error)
+                    return;
                 m_reachable = false;
-                m_error = !netError.isEmpty() ? netError
-                          : code == 200 ? tr("status.json is empty") : tr("HTTP %1").arg(code);
+                m_error = err;
             }
             emit statusChanged();
+            rebuildLive();
         });
+}
+
+void Backend::reloadLive()
+{
+    get(QStringLiteral("/api/live?_=%1").arg(QDateTime::currentMSecsSinceEpoch()),
+        [this](int code, const QJsonObject &body, const QString &) {
+            // On any failure keep the last reading; reload() reports a dead server.
+            if (code != 200 || body.isEmpty())
+                return;
+            m_live = body.toVariantMap();
+            rebuildLive();
+        }, 5000);
+}
+
+void Backend::rebuildLive()
+{
+    QVariantMap out = m_status;
+    QVariantMap host = out.value(QStringLiteral("host")).toMap();
+    if (!m_live.isEmpty() && !host.contains(QStringLiteral("error"))) {
+        const QVariantMap live = m_live.value(QStringLiteral("host")).toMap();
+        QVariantMap cpu = host.value(QStringLiteral("cpu")).toMap();   // keeps the model name
+        const QVariantMap liveCpu = live.value(QStringLiteral("cpu")).toMap();
+        for (auto it = liveCpu.constBegin(); it != liveCpu.constEnd(); ++it)
+            cpu.insert(it.key(), it.value());
+        host.insert(QStringLiteral("cpu"), cpu);
+        for (const char *key : {"memory", "load", "sensors", "uptime_seconds"}) {
+            const QString k = QString::fromLatin1(key);
+            if (live.contains(k))
+                host.insert(k, live.value(k));
+        }
+        out.insert(QStringLiteral("host"), host);
+        const QVariantMap disks = m_live.value(QStringLiteral("disks")).toMap();
+        if (disks.contains(QStringLiteral("filesystems")))
+            out.insert(QStringLiteral("disks"), disks);
+    }
+    m_liveStatus = out;
+    emit liveChanged();
 }
 
 void Backend::refresh()

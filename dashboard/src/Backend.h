@@ -2,8 +2,9 @@
 // Backend — the dashboard's link to the status collector and repair server
 // (project/templates/dashboard/status-collect.py + status-dashboard-server.py),
 // the same pair the Linux and FreeBSD web dashboards talk to. Everything goes
-// over loopback HTTP: status.json for the panels, /api/* for the whitelisted
-// repairs. Nothing here runs a command itself.
+// over loopback HTTP: status.json for the panels, /api/live for the host
+// gauges, /api/* for the whitelisted repairs. Nothing here runs a command
+// itself.
 
 #include <QJsonObject>
 #include <QNetworkAccessManager>
@@ -17,6 +18,10 @@ class Backend : public QObject
 {
     Q_OBJECT
     Q_PROPERTY(QVariantMap status READ status NOTIFY statusChanged)
+    // status with the host gauges (CPU, memory, swap, load, temperatures,
+    // disks) replaced by the 2-second live reading. Only the panels that draw
+    // those bind to it, so the rest of the page is not redrawn every 2 s.
+    Q_PROPERTY(QVariantMap liveStatus READ liveStatus NOTIFY liveChanged)
     Q_PROPERTY(bool reachable READ reachable NOTIFY statusChanged)
     Q_PROPERTY(QString error READ error NOTIFY statusChanged)
     Q_PROPERTY(qint64 generatedEpoch READ generatedEpoch NOTIFY statusChanged)
@@ -37,6 +42,7 @@ public:
     explicit Backend(QObject *parent = nullptr);
 
     QVariantMap status() const { return m_status; }
+    QVariantMap liveStatus() const { return m_liveStatus; }
     bool reachable() const { return m_reachable; }
     QString error() const { return m_error; }
     qint64 generatedEpoch() const { return m_generated; }
@@ -74,6 +80,7 @@ public:
 
 signals:
     void statusChanged();
+    void liveChanged();
     void refreshingChanged();
     void jobChanged();
     void updateChanged();
@@ -87,15 +94,21 @@ private:
     void post(const QString &path, const QJsonObject &body, Reply cb, int timeoutMs = 60000);
     void request(bool isPost, const QString &path, const QJsonObject &body, Reply cb, int timeoutMs);
     void pollJob();
+    void reloadLive();
+    void rebuildLive();
     void rebuildRows(const QVariantList &results, const QString &current);
     void finishJob(const QString &title, const QString &note, bool ok);
 
     QNetworkAccessManager m_net;
     QString m_base;
     QTimer m_statusTimer;
+    QTimer m_liveTimer;
     QTimer m_jobTimer;
 
     QVariantMap m_status;
+    QVariantMap m_live;
+    QVariantMap m_liveStatus;
+    double m_generatedExact = 0;
     bool m_reachable = false;
     QString m_error;
     qint64 m_generated = 0;

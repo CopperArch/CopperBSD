@@ -16,10 +16,10 @@ Panel {
     emptyText: fs.length ? "" : qsTr("no filesystem data")
 
     Repeater {
-        model: root.fs
+        model: root.fs.length         // a count, so rows survive each reading
         delegate: ColumnLayout {
-            required property var modelData
             required property int index
+            readonly property var modelData: root.fs[index] || ({})
             Layout.fillWidth: true
             spacing: 1
             Sub { visible: index === root.firstMember; text: qsTr("pool members") }
