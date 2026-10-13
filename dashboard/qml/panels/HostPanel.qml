@@ -72,9 +72,12 @@ Panel {
             columns: coresBox.n
             spacing: 3
             Repeater {
-                model: root.c.cores || []
+                // a count, not the list: the cells stay and their bars glide
+                // to each new reading instead of being rebuilt every 2 s
+                model: (root.c.cores || []).length
                 delegate: Rectangle {
-                    required property var modelData
+                    required property int index
+                    readonly property var modelData: (root.c.cores || [])[index]
                     width: coresBox.cell
                     height: 26
                     radius: 3

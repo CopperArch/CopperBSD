@@ -104,7 +104,7 @@ design drawn natively instead of in a browser:
 - **More** keeps the app launcher and the local System / Network pages.
 
 It talks over loopback HTTP to two pieces the media project installs: a
-collector (`status-collect.py`, every minute) and a root-run repair server
+collector (`status-collect.py`, every 10 seconds; CPU, memory, swap and disks are read live every 2) and a root-run repair server
 (`status-dashboard-server.py`, `127.0.0.1:8099`). Without the media stack
 there is no data to show and the dashboard says so. The AI chat dock of the
 Linux edition is not part of the native app.
