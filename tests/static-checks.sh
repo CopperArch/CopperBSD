@@ -13,6 +13,12 @@ bad()  { fail=$((fail+1)); printf '  \033[31mFAIL\033[0m %s\n' "$1"; }
 
 echo "== shell syntax (sh -n) =="
 for f in $(find . -name '*.sh' -not -path './freebsd/src-pinned/*' -not -path './.git/*'); do
+    # a script that asks for bash is checked with bash (skipped where there is none)
+    if head -1 "$f" | grep -q bash; then
+        command -v bash >/dev/null 2>&1 || { ok "$f (bash script; no bash here to check it)"; continue; }
+        if bash -n "$f" 2>/dev/null; then ok "$f"; else bad "$f"; fi
+        continue
+    fi
     if sh -n "$f" 2>/dev/null; then ok "$f"; else bad "$f"; fi
 done
 
@@ -54,14 +60,31 @@ ic=installer/configuration/installerconfig
 if [ -f "$ic" ] && grep -q '^DISTRIBUTIONS=' "$ic" && grep -q '^#!/bin/sh' "$ic" \
    && grep -q 'ZFSBOOT_' "$ic"; then ok "installerconfig structure"; else bad "installerconfig structure"; fi
 
-echo "== native dashboard (Qt/QML, no browser) =="
+echo "== native dashboard (Qt/QML; web view only for the terminal dock) =="
 for f in dashboard/CMakeLists.txt dashboard/src/main.cpp dashboard/qml/Main.qml \
          dashboard/data/copper-dashboard.desktop dashboard/assets/logo.png; do
     [ -f "$f" ] && ok "$f" || bad "$f missing"
 done
-if grep -rqiE 'WebEngine|QtWebView|chromium|electron' dashboard/CMakeLists.txt dashboard/src dashboard/qml; then
-    bad "dashboard references a browser engine"
-else ok "dashboard has no browser-engine dependency"; fi
+# The one web view is the terminal dock (ttyd); everything else is native QML,
+# and the dashboard must still build where QtWebEngine is not installed.
+if grep -rliE 'WebEngine|QtWebView|chromium|electron' dashboard/src dashboard/qml \
+        | grep -vE '^dashboard/(src/main\.cpp|qml/dock/)' | grep -q .; then
+    bad "a browser engine is used outside the terminal dock"
+else ok "browser engine confined to the terminal dock"; fi
+if grep -q 'QUIET COMPONENTS WebEngineQuick' dashboard/CMakeLists.txt \
+   && [ -f dashboard/qml/dock/none/TermView.qml ] \
+   && ! grep -q '^import QtWebEngine' dashboard/qml/dock/none/TermView.qml; then
+    ok "dashboard builds without QtWebEngine (dock-less fallback)"
+else bad "QtWebEngine must stay optional for the dashboard build"; fi
+for f in dashboard/qml/dock/TermDock.qml dashboard/qml/dock/web/TermView.qml \
+         project/templates/dashboard/dashboard-pane.sh project/templates/dashboard/ai-panes-check.py; do
+    [ -f "$f" ] && ok "$f" || bad "$f missing (terminal dock)"
+done
+grep -q 'qt6-webengine' installer/configuration/firstboot.sh \
+    && grep -q 'qt6-webengine' installer/configuration/copperbsd-update.sh \
+    && ok "first boot and the updater install qt6-webengine" || bad "qt6-webengine not installed for the dock"
+grep -q -- '--interface 127.0.0.1' project/lib/distro.py && grep -q -- '--check-origin' project/lib/distro.py \
+    && ok "terminal bridge is loopback-only and origin-checked" || bad "ttyd must be loopback-only with --check-origin"
 [ -f project/templates/dashboard/index.html ] && bad "old web dashboard page still present" || ok "old web dashboard page removed"
 
 echo "== media project: CopperBSD's step changes still match upstream =="

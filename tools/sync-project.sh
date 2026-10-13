@@ -10,8 +10,9 @@
 #
 # Two mechanical changes are made to the copy:
 #   * python3.11 -> python3.12 (CopperBSD ships python312 + py312-pyyaml)
-#   * the browser dashboard and the KDE theming are left out; CopperBSD has a
-#     native dashboard (dashboard/) and its own desktop choices
+#   * the browser dashboard page and the KDE theming are left out; CopperBSD
+#     has a native dashboard (dashboard/) and its own desktop choices. The
+#     terminal-pane scripts ARE copied: the native dashboard's dock uses them.
 #
 # Runs on any host (POSIX sh + tar). Finishes with a dry run of the installer.
 set -eu
@@ -42,8 +43,6 @@ trap 'rm -rf "$TMP"' EXIT INT TERM
     --exclude 'templates/dashboard/copperarch-konsole-bg.png' \
     --exclude 'templates/dashboard/copperarch-wallpaper.png' \
     --exclude 'templates/dashboard/kde-panel-defaults.sh' \
-    --exclude 'templates/dashboard/dashboard-pane.sh' \
-    --exclude 'templates/dashboard/ai-panes-check.py' \
     --exclude 'templates/dashboard/status-dashboard-install.sh' \
     --exclude 'templates/dashboard/status-dashboard-run.sh' \
     --exclude 'templates/dashboard/status-dashboard-show.sh' \

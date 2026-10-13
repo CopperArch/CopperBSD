@@ -14,6 +14,7 @@ constexpr int kStatusMs = 2000;
 constexpr int kLiveMs = 2000;
 constexpr int kJobPollMs = 1500;
 const char *kDefaultBase = "http://127.0.0.1:8099";
+const char *kDefaultTerminal = "http://127.0.0.1:7682/";
 } // namespace
 
 Backend::Backend(QObject *parent)
@@ -22,6 +23,9 @@ Backend::Backend(QObject *parent)
     m_base = qEnvironmentVariable("COPPER_DASH_URL", QString::fromLatin1(kDefaultBase));
     while (m_base.endsWith(QLatin1Char('/')))
         m_base.chop(1);
+    m_terminalUrl = qEnvironmentVariable("COPPER_TTYD_URL", QString::fromLatin1(kDefaultTerminal));
+    if (!m_terminalUrl.endsWith(QLatin1Char('/')))
+        m_terminalUrl += QLatin1Char('/');
     m_update = {{QStringLiteral("installed"), QStringLiteral("unknown")},
                 {QStringLiteral("latest"), QStringLiteral("unknown")},
                 {QStringLiteral("available"), QStringLiteral("unknown")}};
@@ -36,6 +40,8 @@ Backend::Backend(QObject *parent)
     reload();
     reloadLive();
     checkUpdate();
+    loadPanes();
+    loadAskTargets();
     // A repair started before this window opened (or from another one) is
     // still worth showing: attach to it.
     get(QStringLiteral("/api/job"), [this](int code, const QJsonObject &job, const QString &) {
@@ -345,6 +351,27 @@ void Backend::openLink(const QString &id)
 {
     post(QStringLiteral("/api/open"), QJsonObject{{QStringLiteral("id"), id}},
          [](int, const QJsonObject &, const QString &) {});
+}
+
+void Backend::loadPanes()
+{
+    get(QStringLiteral("/api/panes"), [this](int code, const QJsonObject &body, const QString &) {
+        if (code != 200)
+            return;
+        m_panes = body.value(QLatin1String("panes")).toArray().toVariantList();
+        m_panesLoaded = true;
+        emit panesChanged();
+    });
+}
+
+void Backend::loadAskTargets()
+{
+    get(QStringLiteral("/api/ask-targets"), [this](int code, const QJsonObject &body, const QString &) {
+        if (code != 200)
+            return;
+        m_askTargets = body.value(QLatin1String("targets")).toArray().toVariantList();
+        emit askTargetsChanged();
+    });
 }
 
 void Backend::setVpnConfig(const QString &config, const QString &name)

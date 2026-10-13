@@ -84,6 +84,9 @@ rebuild_dashboard()
         qt6-declarative qt6-svg kf6-kirigami kf6-qqc2-desktop-style kf6-kio \
         kf6-breeze-icons >>"$LOG" 2>&1 \
         || say "WARNING: dashboard build dependencies failed (see $LOG)"
+    # the terminal dock's web view; the dashboard builds without it, dock-less
+    env ASSUME_ALWAYS_YES=YES pkg install -y qt6-webengine >>"$LOG" 2>&1 \
+        || say "WARNING: qt6-webengine failed to install; building without the terminal dock (see $LOG)"
     BLD=/var/tmp/copper-dashboard-build
     rm -rf "$BLD"
     if cmake -S "$SHARE/dashboard" -B "$BLD" -G Ninja -DCMAKE_BUILD_TYPE=Release \

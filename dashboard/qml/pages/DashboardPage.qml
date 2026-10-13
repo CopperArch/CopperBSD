@@ -21,7 +21,10 @@ Kirigami.Page {
     readonly property var liveHost: live.host || ({})
     // 4 columns on a desktop, 2 when squeezed, 1 in a narrow window — the
     // same three arrangements the web dashboard switches between.
-    readonly property int cols: width >= 1250 ? 4 : width >= 700 ? 2 : 1
+    // Counted on the width left beside the terminal dock, at the width the
+    // dock is heading for, so the panels re-arrange once and not per frame.
+    readonly property real avail: width * (100 - dock.w) / 100
+    readonly property int cols: avail >= 1250 ? 4 : avail >= 700 ? 2 : 1
     property real now: Date.now() / 1000
     Timer { interval: 5000; running: true; repeat: true; onTriggered: page.now = Date.now() / 1000 }
 
@@ -36,6 +39,13 @@ Kirigami.Page {
     readonly property color verdictColor: !dash.reachable ? Theme.dim : nFail ? Theme.fail : (nWarn || nTodo) ? Theme.warn : Theme.ok
     readonly property bool verdictFixable: dash.reachable && (nFail + nWarn + nTodo) > 0 && attention.fixable.fixes.length > 0
 
+    // Dashboard and terminal sit side by side; only the dock's width changes.
+    Item {
+        id: main
+        anchors { left: parent.left; top: parent.top; bottom: parent.bottom }
+        width: page.width - dock.taken
+        visible: width > 1
+        clip: true
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: 16
@@ -75,17 +85,17 @@ Kirigami.Page {
                     }
                     Text { text: "COPPER"; color: Theme.copper; font.family: Theme.brandFont; font.pixelSize: 20; font.weight: Font.ExtraBold; font.letterSpacing: 1.5 }
                     Text { text: "BSD"; color: Theme.brandGray; font.family: Theme.brandFont; font.pixelSize: 20; font.weight: Font.ExtraBold; font.letterSpacing: 1.5 }
-                    Text { visible: page.width >= 900; text: "MEDIA SERVER"; color: Theme.blue; font.family: Theme.brandFont; font.pixelSize: 20; font.weight: Font.ExtraBold; font.letterSpacing: 1.5 }
+                    Text { visible: page.avail >= 900; text: "MEDIA SERVER"; color: Theme.blue; font.family: Theme.brandFont; font.pixelSize: 20; font.weight: Font.ExtraBold; font.letterSpacing: 1.5 }
                 }
             }
             T {
-                visible: page.width >= 1100
+                visible: page.avail >= 1100
                 text: (page.host.hostname || sys.hostname) + "  " + (page.host.os || (sys.osName + " " + sys.kernel))
                 color: Theme.dim; font.pixelSize: 12
                 Layout.maximumWidth: 420
             }
             T {
-                visible: page.width >= 1100
+                visible: page.avail >= 1100
                 text: page.liveHost.uptime_seconds !== undefined ? qsTr("up ") + Theme.dur(page.liveHost.uptime_seconds) : qsTr("up ") + sys.uptime
                 color: Theme.dim; font.pixelSize: 12
             }
@@ -269,6 +279,10 @@ Kirigami.Page {
             }
         }
     }
+
+    }
+
+    TermDock { id: dock; anchors.fill: parent }
 
     // ── "More": the launcher and the local system pages ──────────────────
     QQC2.Menu {

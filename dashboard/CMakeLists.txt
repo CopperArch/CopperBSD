@@ -5,7 +5,16 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(Qt6 6.5 REQUIRED COMPONENTS Core Gui Network Qml Quick QuickControls2)
+# The terminal dock embeds ttyd in a web view. Without QtWebEngine the
+# dashboard still builds; the dock then says what to install.
+find_package(Qt6 6.5 QUIET COMPONENTS WebEngineQuick)
 qt_standard_project_setup(REQUIRES 6.5)
+if(Qt6WebEngineQuick_FOUND)
+    set(TERM_VIEW qml/dock/web/TermView.qml)
+else()
+    message(STATUS "QtWebEngine not found: building without the embedded terminal dock")
+    set(TERM_VIEW qml/dock/none/TermView.qml)
+endif()
 
 qt_add_executable(copper-dashboard src/main.cpp)
 
@@ -31,6 +40,9 @@ qt_add_qml_module(copper-dashboard
         qml/components/Panel.qml
         qml/components/Sheet.qml
         qml/components/ThinScroll.qml
+        qml/dock/TermDock.qml
+        qml/dock/DockBtn.qml
+        ${TERM_VIEW}
         qml/panels/AttentionPanel.qml
         qml/panels/HostPanel.qml
         qml/panels/ThermalPanel.qml
@@ -61,6 +73,11 @@ qt_add_qml_module(copper-dashboard
 target_include_directories(copper-dashboard PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(copper-dashboard PRIVATE
     Qt6::Core Qt6::Gui Qt6::Network Qt6::Qml Qt6::Quick Qt6::QuickControls2)
+
+if(Qt6WebEngineQuick_FOUND)
+    target_compile_definitions(copper-dashboard PRIVATE COPPER_HAVE_WEBENGINE)
+    target_link_libraries(copper-dashboard PRIVATE Qt6::WebEngineQuick)
+endif()
 
 include(GNUInstallDirs)
 install(TARGETS copper-dashboard RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
