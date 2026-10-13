@@ -47,6 +47,9 @@ and a nightly routine that keeps the machine healthy.
 - **Change VPN provider** by pasting a new `.conf` file.
 
 **Dashboard** (a native app, not a web page)
+- A **terminal dock** beside the panels, as on the Linux edition: Claude
+  Code, AI questions and system tools in a pane that takes a quarter, half,
+  three quarters or all of the window.
 - CPU, memory, swap, temperatures and disks, live every 2 seconds.
 - Every jail, service, the VPN and the media library, refreshed every
   10 seconds.
@@ -177,8 +180,37 @@ design drawn natively instead of in a browser:
 It talks over loopback HTTP to two pieces the media project installs: a
 collector (`status-collect.py`, every 10 seconds; CPU, memory, swap and disks are read live every 2) and a root-run repair server
 (`status-dashboard-server.py`, `127.0.0.1:8099`). Without the media stack
-there is no data to show and the dashboard says so. The AI chat dock of the
-Linux edition is not part of the native app.
+there is no data to show and the dashboard says so.
+
+### The terminal dock
+
+![The terminal dock with Claude Code](docs/screenshots/dashboard-dock.png)
+
+The strip at the bottom right is the Linux edition's dock: a **pane picker**,
+an **Ask** box and **off / ¼ / ½ / ¾ / full**. Changing the width never
+restarts what is running; **off** stops it, except that an AI agent keeps
+working in the background (tmux) and is picked up again when its pane is
+reopened. Ctrl+` steps through the widths.
+
+- The terminal is `ttyd` on `127.0.0.1:7682`, run **as the desktop user**
+  (never root) from that user's crontab, shown in the one web view the
+  dashboard has (QtWebEngine). It refuses other origins, and the address
+  can only choose from the fixed list in `dashboard-pane.sh` — it cannot
+  pass a command.
+- The picker lists only what this machine can run. Out of the box that is
+  **Shell, Processes, Jail stats, System log, Dashboard log, Disk usage and
+  Daily routine**.
+- **Claude Code** appears once it is installed. FreeBSD packages it as a
+  Linux program, so it needs Linux binary support:
+  `sysrc linux_enable=YES && service linux start && pkg install claude-code`.
+- **Ask** sends one question to Claude Code or, with an OpenRouter key in
+  `~/.config/status-dashboard/deepseek.env`, to ChatGPT, Gemini, Hy4, GLM,
+  DeepSeek, Minimax or Qwen, with the current price shown.
+- The Linux edition's interactive ChatGPT / Gemini / free-model panes run
+  through `opencode`, which has no FreeBSD package; they are left out of the
+  picker until `opencode` is on the machine.
+- If `qt6-webengine` cannot be installed the dashboard is built without the
+  dock and says so; everything else works.
 
 **Tested how:** the dashboard has been compiled and run on a real FreeBSD
 15.1 machine (a ZFS virtual machine with the full media stack installed), on
@@ -225,11 +257,13 @@ installer stages it and driven by the real `copperbsd_firstboot` functions:
 | Installer run again | converges without rebuilding Seerr or dropping the kill-switch; repairs jails an interrupted run left without their packages |
 | Nightly routine, full pass | 42 OK, 0 warnings, 0 failures; pre-upgrade snapshots taken |
 | Native dashboard | compiles and installs; on a virtual display it shows the live system as "all systems OK"; restart-a-jail, restart-the-tunnel, change-schedule and update-check all work through it |
-| `./test.sh` static checks | 62 passed, 0 failed |
+| Terminal dock | built with QtWebEngine 6.11 by the first-boot build; `ttyd` runs as the desktop user on loopback only; Shell and Jail stats panes open from the picker; Claude Code (from `pkg`, with Linux binary support switched on) starts in the dock and keeps running after **off**; a plain pane is gone the moment the dock is closed; Ask reaches Claude Code |
+| `./test.sh` static checks | 71 passed, 0 failed |
 
 Not run: the graphical installer writing to a disk, the desktop download, the
 dashboard on a real screen, a real commercial VPN provider (the test used a
-WireGuard server of its own), Nextcloud, and public access.
+WireGuard server of its own), Nextcloud, public access, and the dock's AI
+panes with a signed-in Claude account or an OpenRouter key.
 
 ## §18 acceptance report
 

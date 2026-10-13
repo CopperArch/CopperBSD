@@ -38,6 +38,13 @@ class Backend : public QObject
     Q_PROPERTY(QVariantMap update READ update NOTIFY updateChanged)
     Q_PROPERTY(bool updateChecking READ updateChecking NOTIFY updateChanged)
 
+    // Terminal dock: what the pane picker lists, who the ask box can ask,
+    // and where the terminal bridge (ttyd) answers.
+    Q_PROPERTY(QVariantList panes READ panes NOTIFY panesChanged)
+    Q_PROPERTY(bool panesLoaded READ panesLoaded NOTIFY panesChanged)
+    Q_PROPERTY(QVariantList askTargets READ askTargets NOTIFY askTargetsChanged)
+    Q_PROPERTY(QString terminalUrl READ terminalUrl CONSTANT)
+
 public:
     explicit Backend(QObject *parent = nullptr);
 
@@ -59,6 +66,11 @@ public:
     QVariantMap update() const { return m_update; }
     bool updateChecking() const { return m_updateChecking; }
 
+    QVariantList panes() const { return m_panes; }
+    bool panesLoaded() const { return m_panesLoaded; }
+    QVariantList askTargets() const { return m_askTargets; }
+    QString terminalUrl() const { return m_terminalUrl; }
+
     /*! Re-read status.json. */
     Q_INVOKABLE void reload();
     /*! Ask the server to re-collect now, then reload. */
@@ -75,6 +87,9 @@ public:
     Q_INVOKABLE void setSchedule(const QString &frequency, const QString &time);
     /*! Compare the installed CopperBSD version with the latest on GitHub. */
     Q_INVOKABLE void checkUpdate();
+    /*! Re-read the pane list; prices and the Free section change nightly. */
+    Q_INVOKABLE void loadPanes();
+    Q_INVOKABLE void loadAskTargets();
     /*! What a fix id does, for the running-job note. */
     Q_INVOKABLE static QString fixInfo(const QString &id);
 
@@ -84,6 +99,8 @@ signals:
     void refreshingChanged();
     void jobChanged();
     void updateChanged();
+    void panesChanged();
+    void askTargetsChanged();
     void vpnConfigResult(bool ok, const QString &message);
     void scheduleResult(bool ok, const QString &message);
     void rebootResult(bool ok, const QString &message);
@@ -125,4 +142,9 @@ private:
 
     QVariantMap m_update;
     bool m_updateChecking = false;
+
+    QVariantList m_panes;
+    bool m_panesLoaded = false;
+    QVariantList m_askTargets;
+    QString m_terminalUrl;
 };

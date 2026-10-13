@@ -59,6 +59,11 @@ install_dashboard()
     pkg_install cmake ninja pkgconf qt6-base qt6-declarative qt6-svg \
         kf6-kirigami kf6-qqc2-desktop-style kf6-kio kf6-breeze-icons dejavu || \
         say "WARNING: dashboard build dependencies failed (see $LOG)"
+    # qt6-webengine draws the terminal dock (Claude Code and the other panes).
+    # Installed on its own: it is by far the largest of these, and without it
+    # the dashboard still builds -- only the dock is missing.
+    pkg_install qt6-webengine || \
+        say "WARNING: qt6-webengine failed to install; the dashboard is built without its terminal dock (see $LOG)"
     SRC="$SHARE/dashboard"
     BLD=/var/tmp/copper-dashboard-build
     rm -rf "$BLD"
@@ -202,8 +207,8 @@ firstboot_start()
     printf '[Desktop]\nSession=%s\n' "$SESS" > "/home/$USERNAME/.dmrc"
     chown "$USERNAME" "/home/$USERNAME/.dmrc" 2>/dev/null || true
 
-    # Native CopperBSD dashboard (Qt6/QML/Kirigami -- no browser, no web
-    # server). Built here, on the installed system, against the Qt/KDE libraries
+    # Native CopperBSD dashboard (Qt6/QML/Kirigami; QtWebEngine only for the
+    # terminal dock). Built here, on the installed system, against the Qt/KDE libraries
     # that were just downloaded; the source ships on the install medium.
     install_dashboard
 

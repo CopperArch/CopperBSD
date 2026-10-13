@@ -3,6 +3,9 @@
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QQuickStyle>
+#ifdef COPPER_HAVE_WEBENGINE
+#include <QtWebEngineQuick>
+#endif
 
 #include "AppCatalog.h"
 #include "Backend.h"
@@ -11,6 +14,11 @@
 
 int main(int argc, char *argv[])
 {
+#ifdef COPPER_HAVE_WEBENGINE
+    // The terminal dock is a web view onto ttyd; the engine has to be set up
+    // before the application object exists.
+    QtWebEngineQuick::initialize();
+#endif
     QGuiApplication app(argc, argv);
     QGuiApplication::setApplicationName(QStringLiteral("copper-dashboard"));
     QGuiApplication::setApplicationDisplayName(QStringLiteral("CopperBSD Dashboard"));
@@ -34,6 +42,10 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty(QStringLiteral("apps"), &apps);
     engine.rootContext()->setContextProperty(QStringLiteral("media"), &media);
     engine.rootContext()->setContextProperty(QStringLiteral("dash"), &dash);
+    // Set with COPPER_DOCK_WIDTH=<percent>; lets a test or a screenshot start
+    // with the terminal dock open without touching the saved setting.
+    engine.rootContext()->setContextProperty(QStringLiteral("startDockWidth"),
+                                             qEnvironmentVariableIntValue("COPPER_DOCK_WIDTH"));
 
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed, &app,
                      [] { QCoreApplication::exit(1); }, Qt::QueuedConnection);
