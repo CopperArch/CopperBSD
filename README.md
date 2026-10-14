@@ -62,6 +62,12 @@ and a nightly routine that keeps the machine healthy.
 - Nightly: ZFS pool and disk health, stopped jails and services, the VPN
   tunnel, package updates with a ZFS snapshot taken first, clean-up of old
   downloads and caches.
+- Nightly security check: pf on, no VPN leak (a leaking download jail is
+  stopped), secret files such as the WireGuard key owner-only, what the
+  internet can actually reach (probed from outside through the VPN), sshd,
+  and `pkg audit` for known-vulnerable packages on the host and in every
+  jail, upgrading them when a fixed version is out. Pending kernel patches
+  are flagged for a reboot.
 
 ## Screenshots
 
