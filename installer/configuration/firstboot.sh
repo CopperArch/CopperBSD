@@ -50,7 +50,17 @@ wait_for_network() {
 }
 
 pkg_install() {
-    env ASSUME_ALWAYS_YES=YES pkg install -y "$@" >>"$LOG" 2>&1
+    env ASSUME_ALWAYS_YES=YES pkg install -y "$@" >>"$LOG" 2>&1 && return 0
+    # pkg refuses the whole list when one name is missing from the repo (it
+    # happened: brightnessctl, mangowc), which left no desktop at all. Retry
+    # one at a time so everything that does exist still gets installed.
+    say "a package in this set failed -- retrying one at a time"
+    _rc=0
+    for _p in "$@"; do
+        env ASSUME_ALWAYS_YES=YES pkg install -y "$_p" >>"$LOG" 2>&1 ||
+            { say "  could not install $_p"; _rc=1; }
+    done
+    return $_rc
 }
 
 # -- native dashboard --------------------------------------------------------
