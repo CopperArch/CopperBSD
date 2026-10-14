@@ -38,7 +38,9 @@ layout {
 // session, the FreeBSD-native way (no systemd --user).
 spawn-at-startup "quickshell"
 // A wallpaper daemon + notifications + idle/lock, all Wayland-native:
-spawn-at-startup "swaybg" "-i" "/usr/local/share/copperbsd/wallpaper.png" "-m" "fill"
+spawn-at-startup "swaybg" "-i" "/usr/local/share/copperbsd/wallpaper.jpg" "-m" "fill"
+// the CopperBSD control center, as on the other desktops
+spawn-at-startup "copper-dashboard"
 spawn-at-startup "mako"
 spawn-at-startup "swayidle" "-w" "timeout" "600" "swaylock -f" "timeout" "900" "niri msg action power-off-monitors"
 

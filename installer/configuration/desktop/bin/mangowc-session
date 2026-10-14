@@ -9,4 +9,6 @@ export QT_QPA_PLATFORM=wayland
 [ -r /usr/local/etc/copperbsd/keyboard.sh ] && . /usr/local/etc/copperbsd/keyboard.sh
 # MangoWC autostarts via its config; also launch QuickShell as the shell.
 ( sleep 1; quickshell >/tmp/quickshell.log 2>&1 ) &
+# the CopperBSD control center, as on the other desktops
+( sleep 2; command -v copper-dashboard >/dev/null && copper-dashboard >/dev/null 2>&1 ) &
 exec dbus-run-session -- mango

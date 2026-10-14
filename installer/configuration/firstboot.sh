@@ -28,6 +28,18 @@ export PATH
 
 SHARE=/usr/local/share/copperbsd
 LOG=/var/log/copperbsd-firstboot.log
+
+# Build tools out again -- but only if nothing else needs them: pkg delete also
+# removes every package that depends on what it deletes, and GNOME depends on
+# meson -> ninja, so a blanket "pkg delete cmake ninja" uninstalled the gnome
+# metapackage and Nautilus right after installing them.
+remove_build_tools() {
+    for _t in cmake ninja; do
+        pkg info -e "$_t" || continue
+        [ -n "$(pkg query '%rn' "$_t")" ] && continue
+        env ASSUME_ALWAYS_YES=YES pkg delete -y "$_t" >>"$LOG" 2>&1 || true
+    done
+}
 DONE=/var/db/copperbsd-firstboot.done
 NET_WAIT_TRIES=60
 
@@ -91,7 +103,7 @@ install_dashboard()
     fi
     rm -rf "$BLD"
     # build-only tools are not needed at runtime
-    env ASSUME_ALWAYS_YES=YES pkg delete -y cmake ninja >>"$LOG" 2>&1 || true
+    remove_build_tools
 }
 
 # -- media stack -------------------------------------------------------------
@@ -214,6 +226,48 @@ configure_keyboard()
         "$XKB_LAYOUT" "$XKB_VARIANT" > /usr/local/etc/copperbsd/keyboard.sh
 }
 
+# -- login screen ---------------------------------------------------------------
+# Pre-select the chosen desktop in SDDM (it reads /var/lib/sddm/state.conf, not
+# ~/.dmrc, so GNOME installs offered "GNOME Classic" first), give the greeter a
+# real theme when KDE's breeze is not installed, and set its cursor: SDDM runs
+# xsetroot from a PATH without /usr/local/bin and failed ("Could not setup
+# default cursor"), so the pointer only appeared over a widget.
+configure_login_screen()
+{
+    X=/usr/local/share/xsessions; W=/usr/local/share/wayland-sessions
+    case "$DESKTOP" in
+        gnome)   SESS=$X/gnome-xorg.desktop ;;
+        xfce)    SESS=$X/xfce.desktop ;;
+        niri)    SESS=$W/niri.desktop ;;
+        mangowc) SESS=$W/mangowc.desktop ;;
+        *)       SESS=$X/plasmax11.desktop ;;
+    esac
+    if [ -f "$SESS" ]; then
+        install -d -o sddm -g sddm /var/lib/sddm 2>/dev/null || install -d /var/lib/sddm
+        printf '[Last]\nSession=%s\nUser=%s\n' "$SESS" "$USERNAME" > /var/lib/sddm/state.conf
+        chown sddm:sddm /var/lib/sddm/state.conf 2>/dev/null || true
+    else
+        say "WARNING: session file $SESS not found; the login screen keeps its own default"
+    fi
+    _b=$(basename "$SESS" .desktop)
+    printf '[Desktop]\nSession=%s\n' "$_b" > "/home/$USERNAME/.dmrc"
+    chown "$USERNAME" "/home/$USERNAME/.dmrc" 2>/dev/null || true
+
+    install -d /usr/local/libexec /usr/local/etc/sddm.conf.d
+    cat > /usr/local/libexec/copperbsd-xsetup <<'XSETUP'
+#!/bin/sh
+# SDDM display setup: default pointer, then the stock Xsetup.
+/usr/local/bin/xsetroot -cursor_name left_ptr 2>/dev/null
+[ -x /usr/local/share/sddm/scripts/Xsetup ] && exec /usr/local/share/sddm/scripts/Xsetup "$@"
+exit 0
+XSETUP
+    chmod 755 /usr/local/libexec/copperbsd-xsetup
+    {
+        printf '[X11]\nDisplayCommand=/usr/local/libexec/copperbsd-xsetup\n'
+        [ -d /usr/local/share/sddm/themes/breeze ] || printf '[Theme]\nCurrent=maldives\n'
+    } > /usr/local/etc/sddm.conf.d/10-copperbsd.conf
+}
+
 firstboot_start()
 {
     [ -e "$DONE" ] && return 0
@@ -236,7 +290,7 @@ firstboot_start()
     # shellcheck disable=SC2046
     pkg_install $(desktop_pkgs "$DESKTOP") \
         xorg-server xauth xf86-input-libinput xf86-video-scfb xf86-video-vesa \
-        drm-kmod dejavu pipewire wireplumber xkbcomp setxkbmap indexinfo xmlcatmgr || say "WARNING: some desktop packages failed (see $LOG)"
+        drm-kmod dejavu pipewire wireplumber xkbcomp setxkbmap xsetroot indexinfo xmlcatmgr || say "WARNING: some desktop packages failed (see $LOG)"
 
     for kv in $DESKTOP_RC; do sysrc "$kv" >>"$LOG" 2>&1; done
     configure_display
@@ -249,12 +303,15 @@ firstboot_start()
         kldload -n i915kms >>"$LOG" 2>&1 || true   # this boot too: sddm starts below
     fi
 
-    # Session wrappers/configs for the tiling Wayland desktops.
+    # Session wrappers/configs for the tiling Wayland desktops -- only for the
+    # ones that were installed (their entries were in every login menu before,
+    # e.g. Niri and MangoWC offered on a GNOME-only machine).
     D="$SHARE/desktop"
     install -d /usr/local/share/wayland-sessions /usr/local/etc/niri /usr/local/etc/xdg/quickshell
-    cp "$D"/wayland-sessions/*.desktop /usr/local/share/wayland-sessions/ 2>/dev/null || true
-    for w in niri-session mangowc-session; do
-        [ -f "$D/bin/$w" ] && install -m 755 "$D/bin/$w" /usr/local/bin/
+    for w in niri mangowc; do
+        case "$DESKTOP" in "$w"|all) ;; *) continue ;; esac
+        [ -f "$D/wayland-sessions/$w.desktop" ] && cp "$D/wayland-sessions/$w.desktop" /usr/local/share/wayland-sessions/
+        [ -f "$D/bin/$w-session" ] && install -m 755 "$D/bin/$w-session" /usr/local/bin/
     done
     [ -f "$D/etc/niri/config.kdl" ] && cp "$D/etc/niri/config.kdl" /usr/local/etc/niri/ &&
         sed -i '' "s/layout \"us\"/layout \"$XKB_LAYOUT\"${XKB_VARIANT:+; variant \"$XKB_VARIANT\"}/" \
@@ -262,14 +319,12 @@ firstboot_start()
     [ -f "$D/etc/xdg/quickshell/shell.qml" ] &&
         cp "$D/etc/xdg/quickshell/shell.qml" /usr/local/etc/xdg/quickshell/
 
-    # Default session in the SDDM greeter: X11 Plasma (the stable one on FreeBSD).
-    case "$DESKTOP" in
-        niri) SESS=niri ;; mangowc) SESS=mangowc ;; gnome) SESS=gnome ;;
-        xfce) SESS=xfce ;; *) SESS=plasmax11 ;;
-    esac
-    printf '[Desktop]\nSession=%s\n' "$SESS" > "/home/$USERNAME/.dmrc"
-    chown "$USERNAME" "/home/$USERNAME/.dmrc" 2>/dev/null || true
+    # Niri's swaybg wallpaper: the dashboard's background (it pointed at a file
+    # nothing installed, so Niri started on a blank background).
+    [ -f "$SHARE/dashboard/assets/background.jpg" ] &&
+        cp "$SHARE/dashboard/assets/background.jpg" "$SHARE/wallpaper.jpg"
 
+    configure_login_screen
     # Native CopperBSD dashboard (Qt6/QML/Kirigami; QtWebEngine only for the
     # terminal dock). Built here, on the installed system, against the Qt/KDE libraries
     # that were just downloaded; the source ships on the install medium.
