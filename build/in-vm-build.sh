@@ -155,6 +155,11 @@ cp -a "$ROOT/overlays/." "$LIVE_ROOT/"
 # Overlay files carry the build user's uid; everything here must be root-owned
 # (doas refuses a doas.conf that anyone else owns, and rc scripts should be root's).
 ( cd "$ROOT/overlays" && find . -mindepth 1 -print0 | xargs -0 -I{} chown -h root:wheel "$LIVE_ROOT/{}" )
+# rc(8) skips rc.d scripts that are not executable and sddm cannot exec a
+# session wrapper without +x -- a checkout that lost the modes (it happened)
+# boots to a text login instead of the installer. Never trust the checkout.
+chmod 555 "$LIVE_ROOT"/usr/local/etc/rc.d/copperarch_* \
+          "$LIVE_ROOT"/usr/local/bin/copperarch-installer*
 
 # ── 6. live-boot configuration ──────────────────────────────────────────────
 log "configuring the live session (autologin -> installer, writable overlays)"
