@@ -10,6 +10,7 @@
 # Modes:
 #   --list-disks   JSON array of installable disks (for the Disk page)
 #   --keymaps      newline list of keymap names
+#   --apply-keymap NAME  switch the live X session to that layout (setxkbmap)
 #   --timezones    newline list of time zones
 #   --install      read answers (key=value lines) on stdin, perform the install,
 #                  emitting PROGRESS/STEP/LOG/DONE tokens the GUI parses
@@ -82,6 +83,55 @@ UTC
 EOF
 }
 
+# Console (vt) keymap name -> XKB layout/variant, for X and the Wayland
+# compositors. Validated against the installed xkeyboard-config data; anything
+# unknown falls back to us.
+xkb_from_keymap() {
+    base=${1%%.*}; rest=${1#"$base"}
+    XKB_VARIANT=""
+    case "$base" in
+        uk)              XKB_LAYOUT=gb ;;
+        ca)              XKB_LAYOUT=ca; XKB_VARIANT=eng ;;
+        ca-fr)           XKB_LAYOUT=ca ;;
+        ca-multi)        XKB_LAYOUT=ca; XKB_VARIANT=multix ;;
+        ch-fr)           XKB_LAYOUT=ch; XKB_VARIANT=fr ;;
+        latinamerican)   XKB_LAYOUT=latam ;;
+        colemak-dh)      XKB_LAYOUT=us; XKB_VARIANT=colemak_dh ;;
+        colemak*)        XKB_LAYOUT=us; XKB_VARIANT=colemak ;;
+        centraleuropean|nordic) XKB_LAYOUT=us ;;
+        *)               XKB_LAYOUT=$base ;;
+    esac
+    case "$rest" in
+        .dvorakl*) XKB_VARIANT=dvorak-l ;;
+        .dvorakr*) XKB_VARIANT=dvorak-r ;;
+        .dvorakp*) XKB_VARIANT=dvp ;;
+        .f|.f.*)  XKB_VARIANT=f ;;
+        *dvorak*) XKB_VARIANT=dvorak ;;
+        *bepo*)   XKB_VARIANT=bepo ;;
+        *intl*)   XKB_VARIANT=intl ;;
+    esac
+    sym=/usr/local/share/X11/xkb/symbols
+    if [ -d "$sym" ]; then
+        [ -f "$sym/$XKB_LAYOUT" ] || { XKB_LAYOUT=us; XKB_VARIANT=""; }
+        if [ -n "$XKB_VARIANT" ] && \
+           ! grep -q "xkb_symbols \"$XKB_VARIANT\"" "$sym/$XKB_LAYOUT"; then
+            XKB_VARIANT=""
+        fi
+    fi
+}
+
+# Switch the live X session to the picked layout so the test field on the
+# Keyboard page really types in it. Runs as the live user (no doas).
+apply_keymap() {
+    xkb_from_keymap "$1"
+    command -v setxkbmap >/dev/null 2>&1 || exit 0
+    if [ -n "$XKB_VARIANT" ]; then
+        setxkbmap -layout "$XKB_LAYOUT" -variant "$XKB_VARIANT"
+    else
+        setxkbmap -layout "$XKB_LAYOUT"
+    fi
+}
+
 # ── install ─────────────────────────────────────────────────────────────────
 read_answers() {
     DISK=""; ZVDEV="stripe"; SWAP="8"; HOSTNAME="copperarch-media"
@@ -150,6 +200,8 @@ DESKTOP="$DESKTOP"
 USERNAME="$USERNAME"
 MEDIA="$MEDIA"
 KEYMAP="$KEYMAP"
+XKB_LAYOUT="$XKB_LAYOUT"
+XKB_VARIANT="$XKB_VARIANT"
 FBCONF
 sysrc copperbsd_firstboot_enable="YES"
 printf '%s\n' "$DESKTOP" > /etc/copperbsd-desktop
@@ -191,6 +243,7 @@ POST
 
 do_install() {
     read_answers
+    xkb_from_keymap "$KEYMAP"
     [ -n "$DISK" ] || die "No disk selected."
     [ -d "$DISTDIR" ] || [ "${COPPERARCH_FORCE:-0}" = "1" ] || \
         die "No distribution sets at $DISTDIR — not running from install media."
@@ -249,9 +302,10 @@ do_install() {
 case "${1:-}" in
     --list-disks) list_disks ;;
     --keymaps)    list_keymaps ;;
+    --apply-keymap) apply_keymap "${2:-us}" ;;
     --timezones)  list_timezones ;;
     --reboot)     shutdown -r now ;;
     --install)    do_install ;;
-    *) echo "usage: $0 --list-disks|--keymaps|--timezones|--install|--reboot" >&2
+    *) echo "usage: $0 --list-disks|--keymaps|--apply-keymap NAME|--timezones|--install|--reboot" >&2
        exit 2 ;;
 esac

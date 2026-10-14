@@ -155,6 +155,27 @@ XORG
     su -l "$USERNAME" -c "kwriteconfig6 --file kscreenlockerrc --group Daemon --key Autolock false" >>"$LOG" 2>&1 || true
 }
 
+# -- keyboard -----------------------------------------------------------------
+# rc.conf's keymap= covers only the text console. X and the Wayland compositors
+# need XKB names (the console's "uk" is "gb" there); the installer works those
+# out (copperarch-install.sh xkb_from_keymap) and passes them in firstboot.conf.
+# Without this the login screen and every desktop stayed on US.
+configure_keyboard()
+{
+    : "${XKB_LAYOUT:=us}" "${XKB_VARIANT:=}"
+    say "keyboard: console keymap ${KEYMAP:-us} -> XKB layout $XKB_LAYOUT${XKB_VARIANT:+ ($XKB_VARIANT)}"
+    mkdir -p /usr/local/etc/X11/xorg.conf.d /usr/local/etc/copperbsd
+    {
+        printf 'Section "InputClass"\n    Identifier "copperbsd keyboard"\n    MatchIsKeyboard "on"\n'
+        printf '    Option "XkbLayout" "%s"\n' "$XKB_LAYOUT"
+        [ -n "$XKB_VARIANT" ] && printf '    Option "XkbVariant" "%s"\n' "$XKB_VARIANT"
+        printf 'EndSection\n'
+    } > /usr/local/etc/X11/xorg.conf.d/00-copperbsd-keyboard.conf
+    # libxkbcommon reads these when a compositor names no layout (MangoWC)
+    printf 'XKB_DEFAULT_LAYOUT=%s\nXKB_DEFAULT_VARIANT=%s\nexport XKB_DEFAULT_LAYOUT XKB_DEFAULT_VARIANT\n' \
+        "$XKB_LAYOUT" "$XKB_VARIANT" > /usr/local/etc/copperbsd/keyboard.sh
+}
+
 firstboot_start()
 {
     [ -e "$DONE" ] && return 0
@@ -181,6 +202,7 @@ firstboot_start()
 
     for kv in $DESKTOP_RC; do sysrc "$kv" >>"$LOG" 2>&1; done
     configure_display
+    configure_keyboard
     if pciconf -lv 2>/dev/null | grep -qiE 'AMD|Radeon'; then
         sysrc kld_list+="amdgpu" >>"$LOG" 2>&1
     elif pciconf -lv 2>/dev/null | grep -qiE 'Intel.*Graphics'; then
@@ -195,7 +217,8 @@ firstboot_start()
         [ -f "$D/bin/$w" ] && install -m 755 "$D/bin/$w" /usr/local/bin/
     done
     [ -f "$D/etc/niri/config.kdl" ] && cp "$D/etc/niri/config.kdl" /usr/local/etc/niri/ &&
-        sed -i '' "s/layout \"us\"/layout \"$KEYMAP\"/" /usr/local/etc/niri/config.kdl
+        sed -i '' "s/layout \"us\"/layout \"$XKB_LAYOUT\"${XKB_VARIANT:+; variant \"$XKB_VARIANT\"}/" \
+            /usr/local/etc/niri/config.kdl
     [ -f "$D/etc/xdg/quickshell/shell.qml" ] &&
         cp "$D/etc/xdg/quickshell/shell.qml" /usr/local/etc/xdg/quickshell/
 

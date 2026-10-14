@@ -5,6 +5,8 @@ export XDG_RUNTIME_DIR
 [ -d "$XDG_RUNTIME_DIR" ] || { mkdir -p "$XDG_RUNTIME_DIR"; chmod 700 "$XDG_RUNTIME_DIR"; }
 export XDG_SESSION_TYPE=wayland XDG_CURRENT_DESKTOP=mangowc
 export QT_QPA_PLATFORM=wayland
+# keyboard layout picked in the installer (written by first boot)
+[ -r /usr/local/etc/copperbsd/keyboard.sh ] && . /usr/local/etc/copperbsd/keyboard.sh
 # MangoWC autostarts via its config; also launch QuickShell as the shell.
 ( sleep 1; quickshell >/tmp/quickshell.log 2>&1 ) &
 exec dbus-run-session -- mango

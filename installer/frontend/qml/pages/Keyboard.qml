@@ -27,7 +27,10 @@ Item {
                 Layout.preferredWidth: 360
                 model: backend.keymaps
                 currentIndex: Math.max(0, backend.keymaps.indexOf(answers.keymap))
-                onActivated: wizard.setAnswer("keymap", currentText)
+                onActivated: {
+                    wizard.setAnswer("keymap", currentText)
+                    backend.applyKeymap(currentText)
+                }
             }
         }
         TextField {
