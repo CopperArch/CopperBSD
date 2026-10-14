@@ -181,7 +181,10 @@ sysrc -R "$LIVE_ROOT" seatd_enable=YES
 sysrc -R "$LIVE_ROOT" sddm_enable=YES
 sysrc -R "$LIVE_ROOT" moused_enable=YES
 sysrc -R "$LIVE_ROOT" ifconfig_DEFAULT=DHCP
-sysrc -R "$LIVE_ROOT" kld_list="amdgpu i915kms"
+# GPU drivers: overlays/.../rc.d/copperarch_gpu loads only the one this
+# machine needs. DHCP in the background: nothing on the way to the installer
+# needs an address, and rc waited for the lease (seconds on a real network).
+sysrc -R "$LIVE_ROOT" background_dhclient=YES
 # No getty on the first console: sddm switches to the installer a few seconds
 # after rc finishes, and a "login:" prompt flashed up in that gap looked like
 # the boot had stopped. A text login stays on ttyv1 (Alt+F2) and the serial port.
