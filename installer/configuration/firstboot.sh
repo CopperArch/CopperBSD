@@ -295,6 +295,12 @@ firstboot_start()
     for kv in $DESKTOP_RC; do sysrc "$kv" >>"$LOG" 2>&1; done
     configure_display
     configure_keyboard
+    # SDDM lists Wayland sessions only when /dev/dri exists (a KMS GPU); a
+    # Niri/MangoWC-only machine without one has nothing usable to log in to.
+    case "$DESKTOP" in
+        niri|mangowc) display_pci | grep -qiE 'AMD|ATI|Radeon|Intel' ||
+            say "WARNING: $DESKTOP needs an AMD or Intel GPU (KMS); none was found, so the login screen will not offer it" ;;
+    esac
     if display_pci | grep -qiE 'AMD|ATI|Radeon'; then
         sysrc kld_list+="amdgpu" >>"$LOG" 2>&1
         kldload -n amdgpu >>"$LOG" 2>&1 || true   # this boot too: sddm starts below
@@ -323,6 +329,18 @@ firstboot_start()
     # nothing installed, so Niri started on a blank background).
     [ -f "$SHARE/dashboard/assets/background.jpg" ] &&
         cp "$SHARE/dashboard/assets/background.jpg" "$SHARE/wallpaper.jpg"
+
+    # MangoWC ships only config.conf.sample and complains when it finds no
+    # config.conf; use the upstream sample as the system default.
+    [ -f /usr/local/etc/mango/config.conf.sample ] && [ ! -f /usr/local/etc/mango/config.conf ] &&
+        cp /usr/local/etc/mango/config.conf.sample /usr/local/etc/mango/config.conf
+
+    # System-wide default cursor theme: Wayland compositors and plain X
+    # sessions ask for the theme called "default" and drew no pointer.
+    if [ ! -e /usr/local/share/icons/default/index.theme ] && [ -d /usr/local/share/icons/Adwaita/cursors ]; then
+        install -d /usr/local/share/icons/default
+        printf '[Icon Theme]\nName=Default\nInherits=Adwaita\n' > /usr/local/share/icons/default/index.theme
+    fi
 
     configure_login_screen
     # Native CopperBSD dashboard (Qt6/QML/Kirigami; QtWebEngine only for the

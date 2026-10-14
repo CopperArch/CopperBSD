@@ -2,6 +2,12 @@
 # mangowc-session — start MangoWC with QuickShell on FreeBSD.
 : "${XDG_RUNTIME_DIR:=/var/run/user/$(id -u)}"
 export XDG_RUNTIME_DIR
+# FreeBSD ports install system configs under /usr/local/etc/xdg (QuickShell's
+# shell.qml lives there); without this QuickShell found no config and the top
+# bar never appeared. Cursor theme: compositors load "default" otherwise, and
+# there was none.
+export XDG_CONFIG_DIRS="${XDG_CONFIG_DIRS:-/usr/local/etc/xdg:/etc/xdg}"
+export XCURSOR_THEME="${XCURSOR_THEME:-Adwaita}" XCURSOR_SIZE="${XCURSOR_SIZE:-24}"
 [ -d "$XDG_RUNTIME_DIR" ] || { mkdir -p "$XDG_RUNTIME_DIR"; chmod 700 "$XDG_RUNTIME_DIR"; }
 export XDG_SESSION_TYPE=wayland XDG_CURRENT_DESKTOP=mangowc
 export QT_QPA_PLATFORM=wayland

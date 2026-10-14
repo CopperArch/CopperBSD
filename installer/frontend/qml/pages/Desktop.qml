@@ -14,8 +14,8 @@ Item {
         { key: "kde",      name: "KDE Plasma",        blurb: qsTr("Full traditional desktop (X11 + Wayland).") },
         { key: "gnome",    name: "GNOME",             blurb: qsTr("Full GNOME desktop (Wayland).") },
         { key: "xfce",     name: "XFCE",              blurb: qsTr("Lightweight traditional desktop (X11).") },
-        { key: "niri",     name: "Niri + QuickShell", blurb: qsTr("Scrollable-tiling Wayland compositor with QuickShell.") },
-        { key: "mangowc",  name: "MangoWC + QuickShell", blurb: qsTr("dwl/wlroots tiling Wayland compositor with QuickShell.") },
+        { key: "niri",     name: "Niri + QuickShell", blurb: qsTr("Scrollable-tiling Wayland compositor with QuickShell. Needs an AMD or Intel GPU.") },
+        { key: "mangowc",  name: "MangoWC + QuickShell", blurb: qsTr("dwl/wlroots tiling Wayland compositor with QuickShell. Needs an AMD or Intel GPU.") },
         { key: "all",      name: "All of the above",  blurb: qsTr("Install every session; pick one at each login.") }
     ]
 
