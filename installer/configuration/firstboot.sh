@@ -293,6 +293,12 @@ firstboot_start()
         drm-kmod dejavu pipewire wireplumber xkbcomp setxkbmap xsetroot indexinfo xmlcatmgr || say "WARNING: some desktop packages failed (see $LOG)"
 
     for kv in $DESKTOP_RC; do sysrc "$kv" >>"$LOG" 2>&1; done
+    # GNOME (gnome-shell/gnome-session) needs procfs, as the FreeBSD Handbook
+    # says; without it the GNOME session ended the moment it started and SDDM
+    # came straight back.
+    grep -q '^proc[[:space:]]' /etc/fstab 2>/dev/null ||
+        printf 'proc\t/proc\tprocfs\trw\t0\t0\n' >> /etc/fstab
+    mount | grep -q ' on /proc ' || mount -t procfs proc /proc >>"$LOG" 2>&1 || true
     configure_display
     configure_keyboard
     # SDDM lists Wayland sessions only when /dev/dri exists (a KMS GPU); a
