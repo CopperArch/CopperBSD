@@ -83,6 +83,8 @@ Item {
                             spacing: 0
                             Layout.fillWidth: true
                             Text {
+                                Layout.fillWidth: true   // else the size floats mid-row
+                                elide: Text.ElideRight
                                 text: descr + "  (" + device + ")"
                                 color: parent.parent.parent.highlighted
                                        ? Theme.accentText : Theme.text

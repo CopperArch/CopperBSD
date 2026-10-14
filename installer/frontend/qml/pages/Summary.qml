@@ -9,6 +9,11 @@ Item {
     readonly property var answers: StackView.view.answers
 
     function row(k, v) { return { "k": k, "v": v }; }
+    function desktopName(k) {
+        return ({ "kde": "KDE Plasma", "gnome": "GNOME", "xfce": "XFCE",
+                  "niri": "Niri + QuickShell", "mangowc": "MangoWC + QuickShell",
+                  "all": qsTr("All of them (pick one at each login)") })[k] || k
+    }
     readonly property var rows: [
         row(qsTr("Disk"),        answers.disk + qsTr(" (will be erased)")),
         row(qsTr("Layout"),      qsTr("ZFS on root (zroot), %1 GiB swap").arg(answers.swapGiB)),
@@ -16,6 +21,7 @@ Item {
         row(qsTr("User"),        answers.username + (answers.fullname ? " (" + answers.fullname + ")" : "")),
         row(qsTr("Time zone"),   answers.timezone),
         row(qsTr("Keyboard"),    answers.keymap),
+        row(qsTr("Desktop"),     desktopName(answers.desktop)),
         row(qsTr("Media stack"), answers.enableMediaStack ? qsTr("Jellyfin/Plex/*arr + VPN + dashboard")
                                                           : qsTr("Desktop only"))
     ]

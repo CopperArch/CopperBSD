@@ -59,7 +59,7 @@ Item {
                         anchors.rightMargin: Theme.gap
                         spacing: Theme.gap
                         Rectangle {
-                            width: 18; height: 18; radius: 9
+                            Layout.preferredWidth: 18; Layout.preferredHeight: 18; radius: 9
                             color: "transparent"
                             border.width: 2
                             border.color: answers.desktop === modelData.key
@@ -75,11 +75,19 @@ Item {
                             Layout.fillWidth: true
                             spacing: 0
                             Text {
+                                // fillWidth on the texts lets the column take the
+                                // row's width; without it the column stays at its
+                                // text width and floats, so every card's text
+                                // started at a different x.
+                                Layout.fillWidth: true
+                                elide: Text.ElideRight
                                 text: modelData.name
                                 color: answers.desktop === modelData.key ? Theme.accentText : Theme.text
                                 font.bold: true
                             }
                             Text {
+                                Layout.fillWidth: true
+                                elide: Text.ElideRight
                                 text: modelData.blurb
                                 color: answers.desktop === modelData.key ? Theme.accentText : Theme.textDim
                                 font.pixelSize: 12
