@@ -37,12 +37,14 @@ result=1; t=0
 while [ "$t" -lt "$TIMEOUT" ]; do
     sleep 10; t=$((t + 10))
     kill -0 "$QPID" 2>/dev/null || { echo "!! QEMU exited early"; break; }
-    if grep -q 'copperarch_diag' "$SERIAL" 2>/dev/null; then
-        if grep -Eq '/usr/local/bin/copperarch-installer *$' "$SERIAL"; then
+    # the serial console writes CRLF line ends
+    tr -d '\r' < "$SERIAL" > "$WORK/serial.txt" 2>/dev/null
+    if grep -q 'copperarch_diag' "$WORK/serial.txt"; then
+        if grep -Eq '/usr/local/bin/copperarch-installer *$' "$WORK/serial.txt"; then
             echo ">> installer running after ~${t}s"; result=0; break
         fi
         # third (last) dump without the installer: it is not coming
-        [ "$(grep -c '=== copperarch_diag' "$SERIAL")" -ge 3 ] && break
+        [ "$(grep -c '=== copperarch_diag' "$WORK/serial.txt")" -ge 3 ] && break
     fi
 done
 
