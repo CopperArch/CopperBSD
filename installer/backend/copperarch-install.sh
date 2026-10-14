@@ -168,6 +168,9 @@ sysrc ifconfig_DEFAULT="DHCP"
 sysrc sshd_enable="YES"
 sysrc zfs_enable="YES"
 sysrc ntpd_enable="YES"
+# -g on start: ntpd otherwise exits for good when the clock is >1000 s off at
+# boot (a fresh board, a dead CMOS battery, a Windows dual-boot RTC).
+sysrc ntpd_sync_on_start="YES"
 sysrc dumpdev="AUTO"
 sysrc keymap="$KEYMAP"
 
