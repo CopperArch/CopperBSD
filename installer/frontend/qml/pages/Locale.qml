@@ -16,7 +16,7 @@ Item {
         spacing: Theme.gap
 
         Text {
-            text: qsTr("Language & time zone")
+            text: qsTr("Time zone")
             color: Theme.text; font.pixelSize: Theme.fontH1; font.bold: true
         }
         Text {

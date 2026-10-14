@@ -44,4 +44,18 @@ has '(^|/)boot/kernel/kernel' || { echo "!! no kernel in ISO"; fail=1; }
 has 'bin/copper(arch|bsd)-installer' || { echo "!! graphical installer not in ISO"; fail=1; }
 has 'libexec/copperbsd-install\.sh'  || { echo "!! installer backend not in ISO"; fail=1; }
 has 'freebsd-dist/base\.txz' || echo "?? dist sets not in ISO (the installer will fetch them)"
+# The live boot depends on these being executable: rc(8) silently skips a
+# non-executable rc.d script and sddm cannot start a session wrapper without
+# +x -- the ISO then stops at a text login (every CI ISO from 0.1.0 to 0.1.10).
+if [ "$LISTER" = bsdtar ] || [ "$LISTER" = tar ]; then
+    for f in usr/local/etc/rc.d/copperarch_liveuser usr/local/bin/copperarch-installer-x11-session \
+             usr/local/libexec/copperbsd-install.sh; do
+        mode=$($LISTER -tvf "$ISO" "$f" "./$f" 2>/dev/null | awk 'NR==1{print $1}')
+        case "$mode" in
+            -??x*) ;;
+            "") echo "!! $f not found in ISO"; fail=1 ;;
+            *)  echo "!! $f is not executable in the ISO ($mode)"; fail=1 ;;
+        esac
+    done
+fi
 [ "$fail" = 0 ] && echo ">> ISO structural validation: OK" || { echo ">> ISO validation FAILED"; exit 1; }

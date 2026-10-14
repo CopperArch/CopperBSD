@@ -113,6 +113,21 @@ for f in etc/copperarch-live \
     [ -f "overlays/$f" ] && ok "overlay $f" || bad "overlay $f missing"
 done
 
+echo "== scripts are executable in git (rc.d/session wrappers fail silently otherwise) =="
+for f in overlays/usr/local/etc/rc.d/copperarch_liveuser overlays/usr/local/etc/rc.d/copperarch_diag \
+         overlays/usr/local/bin/copperarch-installer-x11-session overlays/usr/local/bin/copperarch-installer-session \
+         installer/backend/copperarch-install.sh installer/configuration/firstboot.sh \
+         overlays/usr/local/etc/rc.d/copperarch_gpu \
+         installer/configuration/copperbsd-update.sh build/in-vm-build.sh; do
+    if git ls-files -s "$f" 2>/dev/null | grep -q '^100755'; then ok "+x $f"
+    elif [ ! -d .git ] && [ -x "$f" ]; then ok "+x $f"
+    else bad "$f is not executable (git update-index --chmod=+x $f)"; fi
+done
+
+echo "== live session sets a default cursor =="
+grep -q 'xsetroot -cursor_name left_ptr' overlays/usr/local/bin/copperarch-installer-x11-session \
+    && ok "x11 installer session sets the root cursor" || bad "x11 installer session has no default cursor (pointer invisible until it crosses a button)"
+
 echo "== pinned FreeBSD commit recorded =="
 if [ -f freebsd/COMMIT ] && grep -qE '^[0-9a-f]{40}$' freebsd/COMMIT; then
     ok "pinned commit $(cat freebsd/COMMIT)"; else bad "freebsd/COMMIT missing or malformed"; fi

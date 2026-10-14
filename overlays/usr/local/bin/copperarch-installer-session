@@ -11,4 +11,5 @@ export XDG_RUNTIME_DIR
 export XDG_SESSION_TYPE=wayland
 export XDG_CURRENT_DESKTOP=copperarch-installer
 export QT_QPA_PLATFORM=wayland
+export XCURSOR_THEME=Adwaita XCURSOR_SIZE=24
 exec dbus-run-session -- cage -- /usr/local/bin/copperarch-installer

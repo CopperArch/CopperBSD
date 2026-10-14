@@ -41,6 +41,7 @@ set -u
 # session (see overlays/.../wayland-sessions/copperarch-installer.desktop).
 : "${PKG_SET:=sddm cage seatd drm-kmod \
     xorg-server xf86-video-scfb xf86-video-vesa xf86-input-libinput dejavu doas \
+    setxkbmap \
     qt6-base qt6-declarative}"
 
 # Build-only tools: needed to compile the installer inside the live-root

@@ -49,6 +49,9 @@ public:
 
     //! Rescan disks (async); emits disksChanged on the DiskModel when done.
     Q_INVOKABLE void refreshDisks();
+    /** Switch the live X session to a console keymap's XKB layout, so the
+     *  Keyboard page's test field types in the picked layout. */
+    Q_INVOKABLE void applyKeymap(const QString &keymap);
 
     /*! Begin installation. \a answers carries the wizard's collected values:
      *  disk, zfsVdev, swapGiB, hostname, username, fullname, password,

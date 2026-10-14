@@ -226,18 +226,47 @@ a virtual display: the panels, the narrow layouts, the dialogs, the repairs
 and a real update from one version to the next. It has **not** been run on a
 physical screen.
 
-## Honest status (this was authored in a Linux sandbox)
+## Test status
 
 Per the project's own rule: nothing below is claimed working unless it was run.
 
-| Thing | Status | Evidence / reason |
+**Tested 2026-10-14, from start to finish.** The ISO was built by CI
+(`.github/workflows/build-iso.yml`), downloaded, checksum-verified, and booted
+in QEMU/KVM with UEFI firmware on an NVMe disk. For each desktop the graphical
+installer was driven page by page to a real install, the machine was rebooted
+into the installed system, first boot ran to the end, and the desktop was
+logged into through the login screen.
+
+| Thing | Status | Evidence |
 |---|---|---|
-| Static validation (shell/Python/YAML/CMake/overlay/installerconfig) | **TESTED, PASS** | `./test.sh` → 42 passed, 0 failed, here on Linux |
-| Pinned FreeBSD source present + commit recorded | **TESTED** | `freebsd/src-pinned/` (release tooling, bsdinstall, rc) + `freebsd/COMMIT` |
-| `bsdinstall` subcommand order / `installerconfig` / `mkisoimages.sh` args | **TESTED against real source** | checked against `freebsd/src-pinned` |
-| Qt installer compiles | **NOT TESTED** | no Qt6/FreeBSD in the authoring sandbox; builds in the FreeBSD builder |
-| ISO actually built | **NOT TESTED HERE** | authoring sandbox has no FreeBSD toolchain, no ISO tools, and FreeBSD mirrors are blocked by its proxy. Fully automated via `build.sh`/CI to run in the real builder |
-| ISO boot-tested in a VM | **NOT TESTED HERE** | same reason; `tests/boot-test.sh` runs it in the builder/CI |
+| Static validation | **TESTED, PASS** | `./test.sh` → 83 passed, 0 failed |
+| Qt installer compiles | **TESTED** | built inside the live root by every CI build; also built and run on Linux (Qt 6.8) to check the pages |
+| ISO actually built | **TESTED** | CI, FreeBSD 15.1 VM, every push; `iso-validate.sh` checks contents and that the live scripts are executable |
+| ISO boots to the installer | **TESTED** | CI boots every ISO (`tests/ci-boot-test.sh`) and fails unless the installer is running; locally ~29 s from power-on, cursor visible immediately |
+| Graphical installer writes a disk | **TESTED** | every page driven with the mouse and keyboard; ZFS install to NVMe; "Installation complete" |
+| Keyboard page | **TESTED** | picking `uk` switches the live session: the test field types `£"#` |
+| First boot (desktop + dashboard + media stack) | **TESTED** | about 10–14 minutes; every step reported, no warnings |
+| KDE Plasma | **TESTED** | login → Plasma (X11); dashboard opens by itself: 0 failed, 0 warnings, 10/10 jails |
+| GNOME | **TESTED** | "GNOME on Xorg" preselected; login → GNOME Shell; dashboard opens by itself. GNOME's screen lock is off under SDDM (GNOME only locks with GDM) |
+| XFCE | **TESTED** | login → XFCE; dashboard opens by itself; after a reboot the greeter is 1920x1080 with the Xfce session preselected and all ten jails back |
+| Niri + QuickShell | **TESTED, without a GPU** | installs; `niri validate` accepts the config; Niri runs (nested, software rendering) with the QuickShell bar, swaybg, mako and the dashboard. **Not run on real KMS hardware** |
+| MangoWC + QuickShell | **INSTALL TESTED ONLY** | packages, config and session install; MangoWC's renderer needs a DRM GPU, so it could not run in the VM. **Not run on real KMS hardware** |
+| All of the above | **NOT TESTED** | the run was stopped before it finished; every desktop in it was tested on its own (above) |
+| Nightly NVMe SMART check | **TESTED** | reads `/dev/nvmeN`; healthy NVMe reported OK, no false "failed" |
+
+Niri and MangoWC need an AMD or Intel GPU: SDDM lists Wayland sessions only
+when `/dev/dri` exists, and the installer says so.
+
+Not run: a physical machine, a real GPU (all desktops above ran on the UEFI
+framebuffer), Wi-Fi, a commercial VPN provider, Nextcloud, public access.
+
+### Earlier history
+
+The original authoring sandbox had no FreeBSD tooling, so the first table in
+this project marked the installer build, the ISO build and the boot test as
+NOT TESTED. Those are all tested now (above). Every CI-built ISO from 0.1.0
+to 0.1.10 stopped at a text login (the live scripts had lost their executable
+bit); that was found by the boot test and fixed in 0.1.11.
 
 **Update, 2026-10-09.** The table above describes the original authoring
 sandbox. Since then an ISO has been built (`CopperBSD-15.1-amd64.iso`, SHA256
@@ -268,8 +297,8 @@ installer stages it and driven by the real `copperbsd_firstboot` functions:
 | Terminal dock | built with QtWebEngine 6.11 by the first-boot build; `ttyd` runs as the desktop user on loopback only; Shell and Jail stats panes open from the picker; Claude Code is installed by the installer (removed first, to prove it), still there after a reboot, starts in the dock and keeps running after **off**; a plain pane is gone the moment the dock is closed; Ask reaches Claude Code |
 | `./test.sh` static checks | 71 passed, 0 failed |
 
-Not run: the graphical installer writing to a disk, the desktop download, the
-dashboard on a real screen, a real commercial VPN provider (the test used a
+Not run in that session: the graphical installer writing to a disk and the
+desktop download (both tested since, see Test status), the dashboard on a real screen, a real commercial VPN provider (the test used a
 WireGuard server of its own), Nextcloud, public access, and the dock's AI
 panes with a signed-in Claude account or an OpenRouter key.
 
@@ -281,12 +310,12 @@ panes with a signed-in Claude account or an OpenRouter key.
 4. **How it integrates with FreeBSD:** the GUI collects answers and runs real `bsdinstall zfsboot/mount/distextract/bootconfig/config` + a chroot post-install; no partitioning is reimplemented.
 5. **Build command:** `./build.sh`
 6. **Test command:** `./test.sh`
-7. **ISO actually produced?** **NO — not in this authoring sandbox** (no FreeBSD/ISO tooling, mirrors blocked). It is produced by `./build.sh` on a FreeBSD host, the QEMU builder, or CI.
+7. **ISO actually produced?** **YES** — by CI on every push (`build-iso.yml`), or `./build.sh` on a FreeBSD host / the QEMU builder.
 8. **ISO filename:** `build/output/CopperBSD-15.1-amd64.iso`
-9. **ISO checksum:** **none yet** — would be fabricated to state one; `.sha256` is emitted by the build.
-10. **ISO boot-tested?** **NO, not here.** `tests/boot-test.sh` performs it in the builder/CI.
-11. **Full install tested?** **NO, not here.** Same harness covers it where QEMU exists.
-12. **Unfinished:** running an actual build+boot requires executing `build.sh` in a FreeBSD-capable environment (CI is the zero-setup path). Everything needed to do so is in this repo.
+9. **ISO checksum:** emitted next to every build (`.sha256`); the tested 2026-10-14 build was `27351ad01bb3db851ad1c802b5c5d9616ba5b6ed3430c9fae121239a5605f72e`.
+10. **ISO boot-tested?** **YES** — CI boots every ISO (`tests/ci-boot-test.sh`), and it was booted and installed by hand in QEMU/KVM (see Test status).
+11. **Full install tested?** **YES** — GUI install to disk, first boot and login for KDE, GNOME, XFCE and Niri (Niri without a GPU); MangoWC install only; the "All of the above" choice not run (see Test status).
+12. **Unfinished:** testing on physical hardware with a real GPU (needed for Niri/MangoWC proper).
 
 ## Structure
 

@@ -80,6 +80,12 @@ QString InstallerBackend::backendPath() const
     return candidates.first();
 }
 
+void InstallerBackend::applyKeymap(const QString &keymap)
+{
+    // Runs as the session user: setxkbmap only needs the X display.
+    QProcess::startDetached(backendPath(), { QStringLiteral("--apply-keymap"), keymap });
+}
+
 void InstallerBackend::refreshDisks()
 {
     // Disconnect any prior scan to keep this re-entrant.

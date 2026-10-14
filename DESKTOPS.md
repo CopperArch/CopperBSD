@@ -12,11 +12,11 @@ no systemd, no logind.
 | GNOME | `gnome` + GDM/SDDM | long-established |
 | XFCE | `xfce` | long-established |
 | **Niri + QuickShell** | `niri`, `quickshell`, `xwayland-satellite` | `x11-wm/niri` **26.04_6** (2026-09-08, commit 7316461) |
-| **MangoWC + QuickShell** | `mangowc`, `quickshell` | `x11-wm/mangowc` **0.10.10** (dwl/wlroots020) |
+| **MangoWC + QuickShell** | `mango`, `quickshell` | `x11-wm/mango` **0.17.4** (MangoWC, dwl/wlroots) |
 
 Shared Wayland core: `wayland wayland-protocols seatd libudev-devd mesa-dri
 libglvnd xwayland drm-kmod` + utilities (`foot swaybg fuzzel mako swayidle
-swaylock wl-clipboard grim slurp wlr-randr brightnessctl pavucontrol-qt`).
+swaylock wl-clipboard grim slurp wlr-randr pavucontrol-qt`; screen brightness uses FreeBSD's own `backlight(8)`).
 
 Defined in `packages/desktops.conf` (`desktop_pkgs <key>`), installed into the
 target by `installer/backend/copperarch-install.sh` during post-install, which

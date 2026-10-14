@@ -28,8 +28,24 @@ export PATH
 
 SHARE=/usr/local/share/copperbsd
 LOG=/var/log/copperbsd-firstboot.log
+
+# Build tools out again -- but only if nothing else needs them: pkg delete also
+# removes every package that depends on what it deletes, and GNOME depends on
+# meson -> ninja, so a blanket "pkg delete cmake ninja" uninstalled the gnome
+# metapackage and Nautilus right after installing them.
+remove_build_tools() {
+    for _t in cmake ninja; do
+        pkg info -e "$_t" || continue
+        [ -n "$(pkg query '%rn' "$_t")" ] && continue
+        env ASSUME_ALWAYS_YES=YES pkg delete -y "$_t" >>"$LOG" 2>&1 || true
+    done
+}
 DONE=/var/db/copperbsd-firstboot.done
 NET_WAIT_TRIES=60
+
+# The media-stack installer prints the generated qBittorrent password into
+# this log; keep it root-only.
+( umask 077; touch "$LOG" ); chmod 600 "$LOG"
 
 say() { printf '[copperbsd-firstboot] %s\n' "$*" | tee -a "$LOG" >/dev/console; }
 
@@ -46,7 +62,17 @@ wait_for_network() {
 }
 
 pkg_install() {
-    env ASSUME_ALWAYS_YES=YES pkg install -y "$@" >>"$LOG" 2>&1
+    env ASSUME_ALWAYS_YES=YES pkg install -y "$@" >>"$LOG" 2>&1 && return 0
+    # pkg refuses the whole list when one name is missing from the repo (it
+    # happened: brightnessctl, mangowc), which left no desktop at all. Retry
+    # one at a time so everything that does exist still gets installed.
+    say "a package in this set failed -- retrying one at a time"
+    _rc=0
+    for _p in "$@"; do
+        env ASSUME_ALWAYS_YES=YES pkg install -y "$_p" >>"$LOG" 2>&1 ||
+            { say "  could not install $_p"; _rc=1; }
+    done
+    return $_rc
 }
 
 # -- native dashboard --------------------------------------------------------
@@ -77,7 +103,7 @@ install_dashboard()
     fi
     rm -rf "$BLD"
     # build-only tools are not needed at runtime
-    env ASSUME_ALWAYS_YES=YES pkg delete -y cmake ninja >>"$LOG" 2>&1 || true
+    remove_build_tools
 }
 
 # -- media stack -------------------------------------------------------------
@@ -112,12 +138,36 @@ setup_media_stack()
 # monitor timings or refresh rate, which left Plasma with an off-screen panel
 # ("requesting unexisting screen geometry", "Bogus refresh rate 0"). Give Xorg
 # an explicit 1920x1080 mode and tell KWin the refresh rate.
+# Vendor/device lines of display-class PCI devices only. Grepping all of
+# pciconf matched the AMD chipset of any AMD-CPU machine as an AMD GPU.
+display_pci()
+{
+    pciconf -lv 2>/dev/null | awk '/^[^ \t]/ { v = ""; d = "" }
+        /^[ \t]+vendor/ { v = $0 } /^[ \t]+device/ { d = $0 }
+        /^[ \t]+class[ \t]*= display/ { print v " " d }'
+}
+
 configure_display()
 {
-    if pciconf -lv 2>/dev/null | grep -qiE 'AMD|Radeon|Intel.*Graphics|NVIDIA'; then
+    if display_pci | grep -qiE 'AMD|ATI|Radeon|Intel'; then
         say "GPU with a KMS driver detected -- leaving Xorg on autodetect"
+    elif [ "$(sysctl -n machdep.bootmethod 2>/dev/null)" = UEFI ]; then
+        # UEFI: only scfb can drive the GOP framebuffer -- vesa needs the
+        # BIOS and fails with "V_BIOS address 0x0 out of range", which left
+        # the login screen dead. scfb cannot switch modes, so the loader is
+        # asked for 1080p (as on the live medium) and X uses whatever it got.
+        say "no KMS GPU, UEFI -- configuring the UEFI framebuffer display (scfb)"
+        grep -q '^efi_max_resolution=' /boot/loader.conf 2>/dev/null || \
+            printf 'efi_max_resolution="1080p"\n' >> /boot/loader.conf
+        mkdir -p /usr/local/etc/X11/xorg.conf.d
+        cat > /usr/local/etc/X11/xorg.conf.d/20-copperbsd-fb.conf <<'XORG'
+Section "Device"
+    Identifier "Card0"
+    Driver "scfb"
+EndSection
+XORG
     else
-        say "no KMS GPU -- configuring a 1920x1080 framebuffer display"
+        say "no KMS GPU, BIOS -- configuring a 1920x1080 VESA display"
         mkdir -p /usr/local/etc/X11/xorg.conf.d
         cat > /usr/local/etc/X11/xorg.conf.d/20-copperbsd-fb.conf <<'XORG'
 Section "Monitor"
@@ -155,6 +205,69 @@ XORG
     su -l "$USERNAME" -c "kwriteconfig6 --file kscreenlockerrc --group Daemon --key Autolock false" >>"$LOG" 2>&1 || true
 }
 
+# -- keyboard -----------------------------------------------------------------
+# rc.conf's keymap= covers only the text console. X and the Wayland compositors
+# need XKB names (the console's "uk" is "gb" there); the installer works those
+# out (copperarch-install.sh xkb_from_keymap) and passes them in firstboot.conf.
+# Without this the login screen and every desktop stayed on US.
+configure_keyboard()
+{
+    : "${XKB_LAYOUT:=us}" "${XKB_VARIANT:=}"
+    say "keyboard: console keymap ${KEYMAP:-us} -> XKB layout $XKB_LAYOUT${XKB_VARIANT:+ ($XKB_VARIANT)}"
+    mkdir -p /usr/local/etc/X11/xorg.conf.d /usr/local/etc/copperbsd
+    {
+        printf 'Section "InputClass"\n    Identifier "copperbsd keyboard"\n    MatchIsKeyboard "on"\n'
+        printf '    Option "XkbLayout" "%s"\n' "$XKB_LAYOUT"
+        [ -n "$XKB_VARIANT" ] && printf '    Option "XkbVariant" "%s"\n' "$XKB_VARIANT"
+        printf 'EndSection\n'
+    } > /usr/local/etc/X11/xorg.conf.d/00-copperbsd-keyboard.conf
+    # libxkbcommon reads these when a compositor names no layout (MangoWC)
+    printf 'XKB_DEFAULT_LAYOUT=%s\nXKB_DEFAULT_VARIANT=%s\nexport XKB_DEFAULT_LAYOUT XKB_DEFAULT_VARIANT\n' \
+        "$XKB_LAYOUT" "$XKB_VARIANT" > /usr/local/etc/copperbsd/keyboard.sh
+}
+
+# -- login screen ---------------------------------------------------------------
+# Pre-select the chosen desktop in SDDM (it reads /var/lib/sddm/state.conf, not
+# ~/.dmrc, so GNOME installs offered "GNOME Classic" first), give the greeter a
+# real theme when KDE's breeze is not installed, and set its cursor: SDDM runs
+# xsetroot from a PATH without /usr/local/bin and failed ("Could not setup
+# default cursor"), so the pointer only appeared over a widget.
+configure_login_screen()
+{
+    X=/usr/local/share/xsessions; W=/usr/local/share/wayland-sessions
+    case "$DESKTOP" in
+        gnome)   SESS=$X/gnome-xorg.desktop ;;
+        xfce)    SESS=$X/xfce.desktop ;;
+        niri)    SESS=$W/niri.desktop ;;
+        mangowc) SESS=$W/mangowc.desktop ;;
+        *)       SESS=$X/plasmax11.desktop ;;
+    esac
+    if [ -f "$SESS" ]; then
+        install -d -o sddm -g sddm /var/lib/sddm 2>/dev/null || install -d /var/lib/sddm
+        printf '[Last]\nSession=%s\nUser=%s\n' "$SESS" "$USERNAME" > /var/lib/sddm/state.conf
+        chown sddm:sddm /var/lib/sddm/state.conf 2>/dev/null || true
+    else
+        say "WARNING: session file $SESS not found; the login screen keeps its own default"
+    fi
+    _b=$(basename "$SESS" .desktop)
+    printf '[Desktop]\nSession=%s\n' "$_b" > "/home/$USERNAME/.dmrc"
+    chown "$USERNAME" "/home/$USERNAME/.dmrc" 2>/dev/null || true
+
+    install -d /usr/local/libexec /usr/local/etc/sddm.conf.d
+    cat > /usr/local/libexec/copperbsd-xsetup <<'XSETUP'
+#!/bin/sh
+# SDDM display setup: default pointer, then the stock Xsetup.
+/usr/local/bin/xsetroot -cursor_name left_ptr 2>/dev/null
+[ -x /usr/local/share/sddm/scripts/Xsetup ] && exec /usr/local/share/sddm/scripts/Xsetup "$@"
+exit 0
+XSETUP
+    chmod 755 /usr/local/libexec/copperbsd-xsetup
+    {
+        printf '[X11]\nDisplayCommand=/usr/local/libexec/copperbsd-xsetup\n'
+        [ -d /usr/local/share/sddm/themes/breeze ] || printf '[Theme]\nCurrent=maldives\n'
+    } > /usr/local/etc/sddm.conf.d/10-copperbsd.conf
+}
+
 firstboot_start()
 {
     [ -e "$DONE" ] && return 0
@@ -177,36 +290,65 @@ firstboot_start()
     # shellcheck disable=SC2046
     pkg_install $(desktop_pkgs "$DESKTOP") \
         xorg-server xauth xf86-input-libinput xf86-video-scfb xf86-video-vesa \
-        drm-kmod dejavu pipewire wireplumber xkbcomp setxkbmap indexinfo xmlcatmgr || say "WARNING: some desktop packages failed (see $LOG)"
+        drm-kmod dejavu pipewire wireplumber xkbcomp setxkbmap xsetroot indexinfo xmlcatmgr || say "WARNING: some desktop packages failed (see $LOG)"
 
     for kv in $DESKTOP_RC; do sysrc "$kv" >>"$LOG" 2>&1; done
+    # GNOME (gnome-shell/gnome-session) needs procfs, as the FreeBSD Handbook
+    # says; without it the GNOME session ended the moment it started and SDDM
+    # came straight back.
+    grep -q '^proc[[:space:]]' /etc/fstab 2>/dev/null ||
+        printf 'proc\t/proc\tprocfs\trw\t0\t0\n' >> /etc/fstab
+    mount | grep -q ' on /proc ' || mount -t procfs proc /proc >>"$LOG" 2>&1 || true
     configure_display
-    if pciconf -lv 2>/dev/null | grep -qiE 'AMD|Radeon'; then
+    configure_keyboard
+    # SDDM lists Wayland sessions only when /dev/dri exists (a KMS GPU); a
+    # Niri/MangoWC-only machine without one has nothing usable to log in to.
+    case "$DESKTOP" in
+        niri|mangowc) display_pci | grep -qiE 'AMD|ATI|Radeon|Intel' ||
+            say "WARNING: $DESKTOP needs an AMD or Intel GPU (KMS); none was found, so the login screen will not offer it" ;;
+    esac
+    if display_pci | grep -qiE 'AMD|ATI|Radeon'; then
         sysrc kld_list+="amdgpu" >>"$LOG" 2>&1
-    elif pciconf -lv 2>/dev/null | grep -qiE 'Intel.*Graphics'; then
+        kldload -n amdgpu >>"$LOG" 2>&1 || true   # this boot too: sddm starts below
+    elif display_pci | grep -qi 'Intel'; then
         sysrc kld_list+="i915kms" >>"$LOG" 2>&1
+        kldload -n i915kms >>"$LOG" 2>&1 || true   # this boot too: sddm starts below
     fi
 
-    # Session wrappers/configs for the tiling Wayland desktops.
+    # Session wrappers/configs for the tiling Wayland desktops -- only for the
+    # ones that were installed (their entries were in every login menu before,
+    # e.g. Niri and MangoWC offered on a GNOME-only machine).
     D="$SHARE/desktop"
     install -d /usr/local/share/wayland-sessions /usr/local/etc/niri /usr/local/etc/xdg/quickshell
-    cp "$D"/wayland-sessions/*.desktop /usr/local/share/wayland-sessions/ 2>/dev/null || true
-    for w in niri-session mangowc-session; do
-        [ -f "$D/bin/$w" ] && install -m 755 "$D/bin/$w" /usr/local/bin/
+    for w in niri mangowc; do
+        case "$DESKTOP" in "$w"|all) ;; *) continue ;; esac
+        [ -f "$D/wayland-sessions/$w.desktop" ] && cp "$D/wayland-sessions/$w.desktop" /usr/local/share/wayland-sessions/
+        [ -f "$D/bin/$w-session" ] && install -m 755 "$D/bin/$w-session" /usr/local/bin/
     done
     [ -f "$D/etc/niri/config.kdl" ] && cp "$D/etc/niri/config.kdl" /usr/local/etc/niri/ &&
-        sed -i '' "s/layout \"us\"/layout \"$KEYMAP\"/" /usr/local/etc/niri/config.kdl
+        sed -i '' "s/layout \"us\"/layout \"$XKB_LAYOUT\"${XKB_VARIANT:+; variant \"$XKB_VARIANT\"}/" \
+            /usr/local/etc/niri/config.kdl
     [ -f "$D/etc/xdg/quickshell/shell.qml" ] &&
         cp "$D/etc/xdg/quickshell/shell.qml" /usr/local/etc/xdg/quickshell/
 
-    # Default session in the SDDM greeter: X11 Plasma (the stable one on FreeBSD).
-    case "$DESKTOP" in
-        niri) SESS=niri ;; mangowc) SESS=mangowc ;; gnome) SESS=gnome ;;
-        xfce) SESS=xfce ;; *) SESS=plasmax11 ;;
-    esac
-    printf '[Desktop]\nSession=%s\n' "$SESS" > "/home/$USERNAME/.dmrc"
-    chown "$USERNAME" "/home/$USERNAME/.dmrc" 2>/dev/null || true
+    # Niri's swaybg wallpaper: the dashboard's background (it pointed at a file
+    # nothing installed, so Niri started on a blank background).
+    [ -f "$SHARE/dashboard/assets/background.jpg" ] &&
+        cp "$SHARE/dashboard/assets/background.jpg" "$SHARE/wallpaper.jpg"
 
+    # MangoWC ships only config.conf.sample and complains when it finds no
+    # config.conf; use the upstream sample as the system default.
+    [ -f /usr/local/etc/mango/config.conf.sample ] && [ ! -f /usr/local/etc/mango/config.conf ] &&
+        cp /usr/local/etc/mango/config.conf.sample /usr/local/etc/mango/config.conf
+
+    # System-wide default cursor theme: Wayland compositors and plain X
+    # sessions ask for the theme called "default" and drew no pointer.
+    if [ ! -e /usr/local/share/icons/default/index.theme ] && [ -d /usr/local/share/icons/Adwaita/cursors ]; then
+        install -d /usr/local/share/icons/default
+        printf '[Icon Theme]\nName=Default\nInherits=Adwaita\n' > /usr/local/share/icons/default/index.theme
+    fi
+
+    configure_login_screen
     # Native CopperBSD dashboard (Qt6/QML/Kirigami; QtWebEngine only for the
     # terminal dock). Built here, on the installed system, against the Qt/KDE libraries
     # that were just downloaded; the source ships on the install medium.

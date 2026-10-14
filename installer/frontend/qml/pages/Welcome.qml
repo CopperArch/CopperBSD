@@ -113,7 +113,7 @@ Item {
             Text {
                 Layout.fillWidth: true
                 Layout.topMargin: Theme.gap
-                text: qsTr("The next steps let you choose language, keyboard and the "
+                text: qsTr("The next steps let you choose the time zone, keyboard and the "
                            + "disk to install onto, then create your account. "
                            + "Nothing is written to disk until you confirm on the "
                            + "Summary page.")

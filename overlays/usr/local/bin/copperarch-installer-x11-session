@@ -7,4 +7,10 @@
 export QT_QPA_PLATFORM=xcb
 export XDG_CURRENT_DESKTOP=copperarch-installer
 LOG="${HOME:-/var/live}/copperarch-installer.log"
+# No window manager runs here, so nothing gives the screen a default cursor:
+# the pointer stayed invisible until it happened to cross a button (which sets
+# its own), then showed X's bare "X" shape. Set the root cursor and theme
+# before the installer maps its window.
+export XCURSOR_THEME=Adwaita XCURSOR_SIZE=24
+command -v xsetroot >/dev/null 2>&1 && xsetroot -cursor_name left_ptr
 exec dbus-run-session -- /usr/local/bin/copperarch-installer >>"$LOG" 2>&1

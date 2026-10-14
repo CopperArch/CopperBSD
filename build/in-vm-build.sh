@@ -155,6 +155,11 @@ cp -a "$ROOT/overlays/." "$LIVE_ROOT/"
 # Overlay files carry the build user's uid; everything here must be root-owned
 # (doas refuses a doas.conf that anyone else owns, and rc scripts should be root's).
 ( cd "$ROOT/overlays" && find . -mindepth 1 -print0 | xargs -0 -I{} chown -h root:wheel "$LIVE_ROOT/{}" )
+# rc(8) skips rc.d scripts that are not executable and sddm cannot exec a
+# session wrapper without +x -- a checkout that lost the modes (it happened)
+# boots to a text login instead of the installer. Never trust the checkout.
+chmod 555 "$LIVE_ROOT"/usr/local/etc/rc.d/copperarch_* \
+          "$LIVE_ROOT"/usr/local/bin/copperarch-installer*
 
 # ── 6. live-boot configuration ──────────────────────────────────────────────
 log "configuring the live session (autologin -> installer, writable overlays)"
@@ -176,7 +181,18 @@ sysrc -R "$LIVE_ROOT" seatd_enable=YES
 sysrc -R "$LIVE_ROOT" sddm_enable=YES
 sysrc -R "$LIVE_ROOT" moused_enable=YES
 sysrc -R "$LIVE_ROOT" ifconfig_DEFAULT=DHCP
-sysrc -R "$LIVE_ROOT" kld_list="amdgpu i915kms"
+# GPU drivers: overlays/.../rc.d/copperarch_gpu loads only the one this
+# machine needs. DHCP in the background: nothing on the way to the installer
+# needs an address, and rc waited for the lease (seconds on a real network).
+sysrc -R "$LIVE_ROOT" background_dhclient=YES
+# ...and don't let rc.d/defaultroute then wait up to 30 s for that lease
+# (the whole 30 s on a machine with no cable plugged in).
+sysrc -R "$LIVE_ROOT" defaultroute_delay=0
+# No getty on the first console: sddm switches to the installer a few seconds
+# after rc finishes, and a "login:" prompt flashed up in that gap looked like
+# the boot had stopped. A text login stays on ttyv1 (Alt+F2) and the serial port.
+sed -i '' 's|^\(ttyv0[[:space:]].*[[:space:]]\)on[a-z]*\([[:space:]]\)|\1off\2|' "$LIVE_ROOT/etc/ttys"
+grep -q '^ttyv0.*[[:space:]]off[[:space:]]' "$LIVE_ROOT/etc/ttys" || log "WARNING: could not turn off the ttyv0 getty"
 # login prompt on the first serial port (matches loader.conf's comconsole)
 sed -i '' 's|^ttyu0.*|ttyu0\t"/usr/libexec/getty 3wire"\tvt100\tonifconsole,secure|' "$LIVE_ROOT/etc/ttys"
 # live marker (the installer refuses to write disks unless this is present)

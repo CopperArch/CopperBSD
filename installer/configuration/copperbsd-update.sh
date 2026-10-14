@@ -33,6 +33,18 @@ SHARE=/usr/local/share/copperbsd
 PROJ=/usr/local/freebsd-media-setup
 VFILE="$SHARE/VERSION"
 LOG=/var/log/copperbsd-update.log
+
+# Build tools out again -- but only if nothing else needs them: pkg delete also
+# removes every package that depends on what it deletes, and GNOME depends on
+# meson -> ninja, so a blanket "pkg delete cmake ninja" uninstalled the gnome
+# metapackage and Nautilus right after installing them.
+remove_build_tools() {
+    for _t in cmake ninja; do
+        pkg info -e "$_t" || continue
+        [ -n "$(pkg query '%rn' "$_t")" ] && continue
+        env ASSUME_ALWAYS_YES=YES pkg delete -y "$_t" >>"$LOG" 2>&1 || true
+    done
+}
 RAW="https://raw.githubusercontent.com/$REPO/$BRANCH/VERSION"
 TARBALL="https://github.com/$REPO/archive/refs/heads/$BRANCH.tar.gz"
 
@@ -100,7 +112,7 @@ rebuild_dashboard()
         rc=1
     fi
     rm -rf "$BLD"
-    env ASSUME_ALWAYS_YES=YES pkg delete -y cmake ninja >>"$LOG" 2>&1 || true
+    remove_build_tools
     return $rc
 }
 

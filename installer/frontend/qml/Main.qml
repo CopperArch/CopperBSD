@@ -54,7 +54,7 @@ ApplicationWindow {
 
     readonly property var steps: [
         { key: "welcome",  label: qsTr("Welcome"),      src: "pages/Welcome.qml" },
-        { key: "locale",   label: qsTr("Language"),     src: "pages/Locale.qml" },
+        { key: "locale",   label: qsTr("Time zone"),    src: "pages/Locale.qml" },
         { key: "keyboard", label: qsTr("Keyboard"),     src: "pages/Keyboard.qml" },
         { key: "desktop",  label: qsTr("Desktop"),      src: "pages/Desktop.qml" },
         { key: "disk",     label: qsTr("Destination"),  src: "pages/Disk.qml" },

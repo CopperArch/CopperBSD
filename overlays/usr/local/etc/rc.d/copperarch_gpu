@@ -1,0 +1,22 @@
+#!/bin/sh
+# PROVIDE: copperarch_gpu
+# REQUIRE: FILESYSTEMS
+# BEFORE: copperarch_liveuser
+# Live medium: load only the KMS driver this machine's GPU needs. A blanket
+# kld_list="amdgpu i915kms" read both (large) modules off the boot medium on
+# every machine, GPU or not -- seconds of delay before the installer.
+. /etc/rc.subr
+name=copperarch_gpu
+start_cmd=copperarch_gpu_start
+stop_cmd=:
+copperarch_gpu_start()
+{
+    gpus=$(pciconf -lv 2>/dev/null | awk '/^[^ \t]/ { v = "" }
+        /^[ \t]+vendor/ { v = $0 } /^[ \t]+class[ \t]*= display/ { print v }')
+    case "$gpus" in
+        *AMD*|*ATI*|*Radeon*) kldload -n amdgpu ;;
+        *Intel*)              kldload -n i915kms ;;
+    esac
+}
+load_rc_config $name
+run_rc_command "$1"
