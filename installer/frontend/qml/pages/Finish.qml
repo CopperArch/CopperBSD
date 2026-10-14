@@ -7,6 +7,10 @@ Item {
     property bool canAdvance: false
     property bool showNav: false
     readonly property var backend: StackView.view.backend
+    readonly property var answers: StackView.view.answers
+    readonly property string desktopName: ({ "kde": "KDE Plasma", "gnome": "GNOME",
+        "xfce": "XFCE", "niri": "Niri", "mangowc": "MangoWC",
+        "all": qsTr("your desktops") })[answers.desktop] || qsTr("your desktop")
 
     ColumnLayout {
         anchors.centerIn: parent
@@ -31,8 +35,8 @@ Item {
             horizontalAlignment: Text.AlignHCenter
             wrapMode: Text.WordWrap
             text: qsTr("CopperArch Media is installed. On first boot it finishes "
-                       + "setting up KDE and brings your media jails online. "
-                       + "Remove the install media and reboot.")
+                       + "setting up %1 and brings your media jails online. "
+                       + "Remove the install media and reboot.").arg(desktopName)
             color: Theme.textDim; font.pixelSize: Theme.fontBody
         }
         Button {
