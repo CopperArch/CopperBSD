@@ -185,6 +185,9 @@ sysrc -R "$LIVE_ROOT" ifconfig_DEFAULT=DHCP
 # machine needs. DHCP in the background: nothing on the way to the installer
 # needs an address, and rc waited for the lease (seconds on a real network).
 sysrc -R "$LIVE_ROOT" background_dhclient=YES
+# ...and don't let rc.d/defaultroute then wait up to 30 s for that lease
+# (the whole 30 s on a machine with no cable plugged in).
+sysrc -R "$LIVE_ROOT" defaultroute_delay=0
 # No getty on the first console: sddm switches to the installer a few seconds
 # after rc finishes, and a "login:" prompt flashed up in that gap looked like
 # the boot had stopped. A text login stays on ttyv1 (Alt+F2) and the serial port.
