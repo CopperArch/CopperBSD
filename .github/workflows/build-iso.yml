@@ -52,6 +52,7 @@ jobs:
           sh tests/iso-validate.sh build/output/*.iso
 
       - name: Upload ISO + checksum
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: CopperBSD-ISO
@@ -59,3 +60,14 @@ jobs:
             build/output/*.iso
             build/output/*.iso.sha256
           if-no-files-found: error
+
+      # Structure is not enough: a valid-looking ISO stopped at a text login
+      # for ten releases. Boot it and require the installer to be running.
+      - name: Boot-test the ISO (installer must start)
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules >/dev/null
+          sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm || true
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends qemu-system-x86 ovmf
+          sh tests/ci-boot-test.sh build/output/*.iso 900

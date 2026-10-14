@@ -31,6 +31,10 @@ LOG=/var/log/copperbsd-firstboot.log
 DONE=/var/db/copperbsd-firstboot.done
 NET_WAIT_TRIES=60
 
+# The media-stack installer prints the generated qBittorrent password into
+# this log; keep it root-only.
+( umask 077; touch "$LOG" ); chmod 600 "$LOG"
+
 say() { printf '[copperbsd-firstboot] %s\n' "$*" | tee -a "$LOG" >/dev/console; }
 
 wait_for_network() {
@@ -112,12 +116,36 @@ setup_media_stack()
 # monitor timings or refresh rate, which left Plasma with an off-screen panel
 # ("requesting unexisting screen geometry", "Bogus refresh rate 0"). Give Xorg
 # an explicit 1920x1080 mode and tell KWin the refresh rate.
+# Vendor/device lines of display-class PCI devices only. Grepping all of
+# pciconf matched the AMD chipset of any AMD-CPU machine as an AMD GPU.
+display_pci()
+{
+    pciconf -lv 2>/dev/null | awk '/^[^ \t]/ { v = ""; d = "" }
+        /^[ \t]+vendor/ { v = $0 } /^[ \t]+device/ { d = $0 }
+        /^[ \t]+class[ \t]*= display/ { print v " " d }'
+}
+
 configure_display()
 {
-    if pciconf -lv 2>/dev/null | grep -qiE 'AMD|Radeon|Intel.*Graphics|NVIDIA'; then
+    if display_pci | grep -qiE 'AMD|ATI|Radeon|Intel'; then
         say "GPU with a KMS driver detected -- leaving Xorg on autodetect"
+    elif [ "$(sysctl -n machdep.bootmethod 2>/dev/null)" = UEFI ]; then
+        # UEFI: only scfb can drive the GOP framebuffer -- vesa needs the
+        # BIOS and fails with "V_BIOS address 0x0 out of range", which left
+        # the login screen dead. scfb cannot switch modes, so the loader is
+        # asked for 1080p (as on the live medium) and X uses whatever it got.
+        say "no KMS GPU, UEFI -- configuring the UEFI framebuffer display (scfb)"
+        grep -q '^efi_max_resolution=' /boot/loader.conf 2>/dev/null || \
+            printf 'efi_max_resolution="1080p"\n' >> /boot/loader.conf
+        mkdir -p /usr/local/etc/X11/xorg.conf.d
+        cat > /usr/local/etc/X11/xorg.conf.d/20-copperbsd-fb.conf <<'XORG'
+Section "Device"
+    Identifier "Card0"
+    Driver "scfb"
+EndSection
+XORG
     else
-        say "no KMS GPU -- configuring a 1920x1080 framebuffer display"
+        say "no KMS GPU, BIOS -- configuring a 1920x1080 VESA display"
         mkdir -p /usr/local/etc/X11/xorg.conf.d
         cat > /usr/local/etc/X11/xorg.conf.d/20-copperbsd-fb.conf <<'XORG'
 Section "Monitor"
@@ -203,10 +231,12 @@ firstboot_start()
     for kv in $DESKTOP_RC; do sysrc "$kv" >>"$LOG" 2>&1; done
     configure_display
     configure_keyboard
-    if pciconf -lv 2>/dev/null | grep -qiE 'AMD|Radeon'; then
+    if display_pci | grep -qiE 'AMD|ATI|Radeon'; then
         sysrc kld_list+="amdgpu" >>"$LOG" 2>&1
-    elif pciconf -lv 2>/dev/null | grep -qiE 'Intel.*Graphics'; then
+        kldload -n amdgpu >>"$LOG" 2>&1 || true   # this boot too: sddm starts below
+    elif display_pci | grep -qi 'Intel'; then
         sysrc kld_list+="i915kms" >>"$LOG" 2>&1
+        kldload -n i915kms >>"$LOG" 2>&1 || true   # this boot too: sddm starts below
     fi
 
     # Session wrappers/configs for the tiling Wayland desktops.

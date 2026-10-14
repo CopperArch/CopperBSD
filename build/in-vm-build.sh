@@ -182,6 +182,11 @@ sysrc -R "$LIVE_ROOT" sddm_enable=YES
 sysrc -R "$LIVE_ROOT" moused_enable=YES
 sysrc -R "$LIVE_ROOT" ifconfig_DEFAULT=DHCP
 sysrc -R "$LIVE_ROOT" kld_list="amdgpu i915kms"
+# No getty on the first console: sddm switches to the installer a few seconds
+# after rc finishes, and a "login:" prompt flashed up in that gap looked like
+# the boot had stopped. A text login stays on ttyv1 (Alt+F2) and the serial port.
+sed -i '' 's|^\(ttyv0[[:space:]].*[[:space:]]\)on[a-z]*\([[:space:]]\)|\1off\2|' "$LIVE_ROOT/etc/ttys"
+grep -q '^ttyv0.*[[:space:]]off[[:space:]]' "$LIVE_ROOT/etc/ttys" || log "WARNING: could not turn off the ttyv0 getty"
 # login prompt on the first serial port (matches loader.conf's comconsole)
 sed -i '' 's|^ttyu0.*|ttyu0\t"/usr/libexec/getty 3wire"\tvt100\tonifconsole,secure|' "$LIVE_ROOT/etc/ttys"
 # live marker (the installer refuses to write disks unless this is present)
