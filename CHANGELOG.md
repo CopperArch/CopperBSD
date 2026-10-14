@@ -5,6 +5,9 @@ merged to `main` gets the next patch number from
 `.github/workflows/bump-version.yml`, which also adds the change to this file.
 A change that edits `VERSION` itself (for a bigger jump) is left as it is.
 
+## 0.1.10 - 2026-10-14
+- Nightly security & firewall check, and right-click paste in terminal panes (#10)
+
 ## 0.1.9 - 2026-10-13
 - Dashboard: the terminal dock (Claude Code, Ask, system panes), as on Linux (#9)
 
