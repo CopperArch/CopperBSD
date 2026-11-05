@@ -5,6 +5,9 @@ merged to `main` gets the next patch number from
 `.github/workflows/bump-version.yml`, which also adds the change to this file.
 A change that edits `VERSION` itself (for a bigger jump) is left as it is.
 
+## 0.1.13 - 2026-11-05
+- Sync from upstream: nightly intrusion & malware check (#13)
+
 ## 0.1.12 - 2026-11-05
 - Sync from upstream: qBittorrent peer check, English-only audio, reboot after kernel updates (#12)
 
