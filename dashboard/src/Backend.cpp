@@ -327,6 +327,11 @@ void Backend::cancelJob()
     });
 }
 
+void Backend::aiOff()
+{
+    post(QStringLiteral("/api/ai-off"), {}, [](int, const QJsonObject &, const QString &) {});
+}
+
 void Backend::dismissJob()
 {
     if (m_jobRunning)

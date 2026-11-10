@@ -78,6 +78,9 @@ public:
     /*! Run whitelisted fixes: a list of {id, args, label}. */
     Q_INVOKABLE void runFixes(const QVariantList &fixes, const QString &title);
     Q_INVOKABLE void cancelJob();
+    /*! "off" on the terminal dock: stop every AI/agent pane (their tmux
+        sessions outlive a closed page) and unload Ollama models. */
+    Q_INVOKABLE void aiOff();
     /*! Forget a finished job (closes the result sheet for good). */
     Q_INVOKABLE void dismissJob();
     Q_INVOKABLE void reboot();

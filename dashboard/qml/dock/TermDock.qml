@@ -109,6 +109,11 @@ Item {
     }
 
     function setWidth(next) {
+        // "off" = really off: the agent panes run in tmux sessions that survive
+        // the page closing, so ask the server to kill them (and unload any
+        // Ollama model). Only from a deliberate press, never on start-up.
+        if (next === 0)
+            dash.aiOff()
         apply(next, true)
         // Opening the dock counts as wanting to use it; the width buttons
         // never restart a session that is already running.
