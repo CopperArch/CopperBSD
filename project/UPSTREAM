@@ -1,4 +1,4 @@
 source:  github.com/CopperArch/freebsd-media-setup-with-dash
-version: 0.6.16
-commit:  d29f6a9f41545942a899f04f6183be3bdc7c386e
+version: 0.6.17
+commit:  824bb6bdbfafe9f2cb2f5d181436a17bc92220a2
 synced by tools/sync-project.sh; do not edit the copied files here
