@@ -5,6 +5,9 @@ merged to `main` gets the next patch number from
 `.github/workflows/bump-version.yml`, which also adds the change to this file.
 A change that edits `VERSION` itself (for a bigger jump) is left as it is.
 
+## 0.1.16 - 2026-11-12
+- Sync project: qBittorrent re-login on 403, longer dual-audio fallback timeout (#16)
+
 ## 0.1.15 - 2026-11-10
 - Sync from upstream: English-dub fallback for foreign-original titles (#15)
 
