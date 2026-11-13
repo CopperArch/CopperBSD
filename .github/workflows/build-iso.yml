@@ -35,12 +35,34 @@ jobs:
           # buildworld/pkg need space + RAM
           mem: 8192
           cpu: 4
+          # The action's own copy-back is one rsync of the whole workspace with
+          # no retry; the ssh link to the VM dropped mid-ISO on 2 of 5 builds
+          # (2026-11-10, 2026-11-13: "connection unexpectedly closed", code 12)
+          # and the whole ~1 h build was lost. The next step copies only the ISO,
+          # resumable and retried.
+          copyback: false
           prepare: |
             pkg install -y git cmake ninja pkgconf
           run: |
             set -e
             export FROM_SOURCE="${{ github.event.inputs.from_source || '0' }}"
             sh build/in-vm-build.sh
+
+      - name: Copy the ISO back from the VM (resumable, retried)
+        run: |
+          mkdir -p build/output
+          for i in 1 2 3 4 5; do
+            if rsync -a --partial --append-verify --timeout=120 \
+                 --rsync-path=/usr/local/bin/rsync \
+                 -e "ssh -o ServerAliveInterval=15 -o ServerAliveCountMax=8" \
+                 "freebsd:$GITHUB_WORKSPACE/build/output/" build/output/; then
+              ls -l build/output
+              exit 0
+            fi
+            echo "copy attempt $i failed; resuming in 20 s"
+            sleep 20
+          done
+          exit 1
 
       - name: Validate the ISO
         run: |
