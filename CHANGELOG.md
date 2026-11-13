@@ -5,6 +5,9 @@ merged to `main` gets the next patch number from
 `.github/workflows/bump-version.yml`, which also adds the change to this file.
 A change that edits `VERSION` itself (for a bigger jump) is left as it is.
 
+## 0.1.19 - 2026-11-13
+- CI: copy the ISO back from the build VM resumably, with retries (#19)
+
 ## 0.1.18 - 2026-11-13
 - Sync project: media-heal fake-release purge, cam-tag markers, IMAX upgrades; nightly run gets the API keys (#18)
 
