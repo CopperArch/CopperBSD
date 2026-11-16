@@ -5,6 +5,9 @@ merged to `main` gets the next patch number from
 `.github/workflows/bump-version.yml`, which also adds the change to this file.
 A change that edits `VERSION` itself (for a bigger jump) is left as it is.
 
+## 0.1.22 - 2026-11-16
+- Sync project/ from freebsd-media-setup ade520f: season ratings on poster badges (#22)
+
 ## 0.1.21 - 2026-11-16
 - Sync project/ from freebsd-media-setup a3204b1: Jellyfin poster badges (#21)
 
