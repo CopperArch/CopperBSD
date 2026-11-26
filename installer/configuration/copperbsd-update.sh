@@ -39,7 +39,7 @@ LOG=/var/log/copperbsd-update.log
 # meson -> ninja, so a blanket "pkg delete cmake ninja" uninstalled the gnome
 # metapackage and Nautilus right after installing them.
 remove_build_tools() {
-    for _t in cmake ninja; do
+    for _t in cmake cmake-core ninja; do
         pkg info -e "$_t" || continue
         [ -n "$(pkg query '%rn' "$_t")" ] && continue
         env ASSUME_ALWAYS_YES=YES pkg delete -y "$_t" >>"$LOG" 2>&1 || true
@@ -92,7 +92,7 @@ check()
 rebuild_dashboard()
 {
     say "rebuilding the dashboard app"
-    env ASSUME_ALWAYS_YES=YES pkg install -y cmake ninja pkgconf qt6-base \
+    env ASSUME_ALWAYS_YES=YES pkg install -y cmake-core ninja pkgconf qt6-base \
         qt6-declarative qt6-svg kf6-kirigami kf6-qqc2-desktop-style kf6-kio \
         kf6-breeze-icons >>"$LOG" 2>&1 \
         || say "WARNING: dashboard build dependencies failed (see $LOG)"

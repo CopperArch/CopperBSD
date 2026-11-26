@@ -47,7 +47,7 @@ set -u
 # Build-only tools: needed to compile the installer inside the live-root
 # chroot, deleted from the image before packing (in-vm-build.sh step 4.5) so
 # they never ship on the medium at all.
-: "${BUILD_ONLY_PKGS:=cmake ninja pkgconf git}"
+: "${BUILD_ONLY_PKGS:=cmake-core ninja pkgconf git}"
 
 # ── repo root (the CopperBSD checkout) ──────────────────────────────────────
 # Resolved relative to this file so it works wherever the repo lives.

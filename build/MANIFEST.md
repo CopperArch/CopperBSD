@@ -25,7 +25,7 @@ Everything that differs from stock FreeBSD 15.1, so the system stays auditable.
 | `/etc/fstab` (live) | `in-vm-build.sh` | read-only root + tmpfs writable overlays |
 
 ## Packages baked in (binary pkg, latest at build time)
-`kde6 sddm xorg drm-kmod qt6-base qt6-declarative qt6-quickcontrols2 cmake ninja
+`kde6 sddm xorg drm-kmod qt6-base qt6-declarative qt6-quickcontrols2 cmake-core ninja
 pkgconf git python311 py311-yaml bastille wireguard-tools caddy ttyd bash`
 plus the per-service packages the media stack installs into jails at first run
 (see `project/stacks/stack.yaml` and `project/lib/platform.py`).
