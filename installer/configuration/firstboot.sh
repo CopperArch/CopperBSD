@@ -34,7 +34,7 @@ LOG=/var/log/copperbsd-firstboot.log
 # meson -> ninja, so a blanket "pkg delete cmake ninja" uninstalled the gnome
 # metapackage and Nautilus right after installing them.
 remove_build_tools() {
-    for _t in cmake ninja; do
+    for _t in cmake cmake-core ninja; do
         pkg info -e "$_t" || continue
         [ -n "$(pkg query '%rn' "$_t")" ] && continue
         env ASSUME_ALWAYS_YES=YES pkg delete -y "$_t" >>"$LOG" 2>&1 || true
@@ -82,7 +82,7 @@ install_dashboard()
     say "building the CopperBSD dashboard"
     # dejavu: the dashboard's own fonts have no arrows or check marks; without
     # a fallback font its button icons draw as empty boxes.
-    pkg_install cmake ninja pkgconf qt6-base qt6-declarative qt6-svg \
+    pkg_install cmake-core ninja pkgconf qt6-base qt6-declarative qt6-svg \
         kf6-kirigami kf6-qqc2-desktop-style kf6-kio kf6-breeze-icons dejavu || \
         say "WARNING: dashboard build dependencies failed (see $LOG)"
     # qt6-webengine draws the terminal dock (Claude Code and the other panes).
