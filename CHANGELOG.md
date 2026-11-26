@@ -5,6 +5,9 @@ merged to `main` gets the next patch number from
 `.github/workflows/bump-version.yml`, which also adds the change to this file.
 A change that edits `VERSION` itself (for a bigger jump) is left as it is.
 
+## 0.1.25 - 2026-11-26
+- Build: install cmake-core instead of cmake (FreeBSD package renamed) (#25)
+
 ## 0.1.24 - 2026-11-26
 - Sync project/ with freebsd-media-setup #31: replace black Jellyfin posters/episode thumbnails nightly (#24)
 
